@@ -5,7 +5,7 @@ import goodfire
 from goodfire import AsyncClient
 import asyncio
 from ..core.config import Settings, get_settings
-from ..models.chat import ChatRequest, ChatMessage
+from ..models.chat import ChatRequest, ChatMessage, ChatResponse
 import logging
 
 router = APIRouter()
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 async def create_chat_completion(
     request: ChatRequest,
     settings: Settings = Depends(get_settings)
-) -> dict:
+) -> ChatResponse:
     # Initialize Goodfire client with validated key
     client = AsyncClient(settings.get_ember_api_key)
     
@@ -36,7 +36,8 @@ async def create_chat_completion(
         # Extract the content from the response
         content = response.choices[0].message["content"] if response.choices else ""
         
-        return {"content": content}
+        # Return in the format expected by frontend
+        return ChatResponse(content=content)
         
     except Exception as e:
         logger.error(f"Error processing chat request: {str(e)}")
