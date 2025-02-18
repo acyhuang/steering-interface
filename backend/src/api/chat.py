@@ -41,4 +41,9 @@ async def create_chat_completion(
         
     except Exception as e:
         logger.error(f"Error processing chat request: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/health")
+async def health_check():
+    """Simple health check endpoint."""
+    return {"status": "ok"} 
