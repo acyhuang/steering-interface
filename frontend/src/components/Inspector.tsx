@@ -2,10 +2,11 @@ import { Input } from "./ui/input"
 import { Card } from "./ui/card"
 import { ScrollArea } from "./ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Search } from "lucide-react"
 import { Button } from "./ui/button"
-import { FeatureActivation } from "@/types/features"
+import { FeatureActivation, SteerFeatureResponse } from "@/types/features"
+import { FeatureCard } from './FeatureCard'
 
 interface InspectorProps {
   features?: FeatureActivation[];
@@ -14,7 +15,22 @@ interface InspectorProps {
 
 export function Inspector({ features, isLoading }: InspectorProps) {
   const [searchQuery, setSearchQuery] = useState("")
+  const [localFeatures, setLocalFeatures] = useState(features || [])
   
+  useEffect(() => {
+    setLocalFeatures(features || [])
+  }, [features])
+
+  const handleSteer = (response: SteerFeatureResponse) => {
+    setLocalFeatures(current => 
+      current.map(f => 
+        f.label === response.label 
+          ? { ...f, activation: response.activation }
+          : f
+      )
+    )
+  }
+
   const handleSearch = () => {
     // TODO: Implement search functionality
     console.log("Searching for:", searchQuery)
@@ -53,15 +69,14 @@ export function Inspector({ features, isLoading }: InspectorProps) {
             <TabsContent value="activated" className="m-0">
               {isLoading ? (
                 <div className="text-sm text-gray-500">Loading features...</div>
-              ) : features && features.length > 0 ? (
+              ) : localFeatures && localFeatures.length > 0 ? (
                 <div className="space-y-2">
-                  {features.map((feature, index) => (
-                    <div key={index} className="text-sm">
-                      <span className="font-medium">{feature.label}</span>
-                      <span className="text-gray-500 ml-2">
-                        ({feature.activation.toFixed(3)})
-                      </span>
-                    </div>
+                  {localFeatures.map((feature, index) => (
+                    <FeatureCard 
+                      key={index} 
+                      feature={feature}
+                      onSteer={handleSteer}
+                    />
                   ))}
                 </div>
               ) : (

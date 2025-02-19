@@ -14,4 +14,5 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     content: str
-    variant_id: str 
+    variant_id: str
+    variant_json: Optional[str] = None 

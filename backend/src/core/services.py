@@ -1,9 +1,10 @@
 from typing import AsyncGenerator, List, Optional, Dict
 from goodfire import AsyncClient, Variant
 from ..models.chat import ChatMessage, ChatRequest, ChatResponse
-from ..models.features import FeatureActivation
+from ..models.features import FeatureActivation, SteerFeatureResponse
 import logging
 from .config import Settings
+import json  # Add this import at the top
 
 # Configure logging
 logging.basicConfig(
@@ -105,9 +106,12 @@ class EmberService:
             Exception: If the API call fails
         """
         try:
-            logger.info(f"(2 of 2) Creating chat completion")
+            logger.info(f"Creating chat completion for variant {variant_id}")
             
             variant = self.get_variant(session_id, variant_id)
+            # Convert the dictionary to a JSON string
+            variant_json = json.dumps(variant.json(), indent=2)
+            logger.info(f"Variant JSON: {variant_json}")
             
             response = await self.client.chat.completions.create(
                 messages=[{"role": msg.role, "content": msg.content} for msg in messages],
@@ -119,11 +123,11 @@ class EmberService:
             )
             
             content = response.choices[0].message["content"] if response.choices else ""
-            logger.debug(f"Received response")
             
             return ChatResponse(
                 content=content,
-                variant_id=variant_id or "default"  # If no variant_id, it's the default
+                variant_id=variant_id or "default",
+                variant_json=variant_json
             )
             
         except Exception as e:
@@ -141,7 +145,7 @@ class EmberService:
             )
             
             activations = []
-            for activation in inspector.top(k=10):
+            for activation in inspector.top(k=20):
                 activations.append(FeatureActivation(
                     label=activation.feature.label,
                     activation=activation.activation
@@ -151,4 +155,55 @@ class EmberService:
             
         except Exception as e:
             logger.error(f"Error in inspect_features: {str(e)}")
+            raise 
+
+    async def steer_feature(
+        self,
+        session_id: str,
+        variant_id: Optional[str],
+        feature_label: str,
+        value: float
+    ) -> SteerFeatureResponse:
+        """Steer a feature's activation value."""
+        try:
+            variant = self.get_variant(session_id, variant_id)
+            
+            # Search for the feature
+            features = await self.client.features.search(
+                feature_label,
+                model=variant,
+                top_k=1
+            )
+            
+            if not features:
+                raise ValueError(f"Feature '{feature_label}' not found")
+                
+            feature = features[0]
+            
+            # Apply the steering
+            variant.set(feature, value)
+            
+            # For inspection, we need at least one message
+            # Use a simple test message to get feature activations
+            test_message = {"role": "user", "content": "This is a test message."}
+            
+            # Get the current activation
+            inspector = await self.client.features.inspect(
+                messages=[test_message],
+                model=variant
+            )
+            
+            # Find our feature in the results
+            for activation in inspector.top(k=100):
+                if activation.feature.label == feature_label:
+                    return SteerFeatureResponse(
+                        label=feature_label,
+                        activation=activation.activation,
+                        modified_value=value
+                    )
+            
+            raise ValueError(f"Could not verify steering of feature '{feature_label}'")
+            
+        except Exception as e:
+            logger.error(f"Error in steer_feature: {str(e)}")
             raise 

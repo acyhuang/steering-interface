@@ -11,4 +11,5 @@ export interface ChatRequest {
 export interface ChatResponse {
   content: string;
   variant_id: string;
+  variant_json?: string;
 } 

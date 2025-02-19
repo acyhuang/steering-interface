@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Card } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { ChatMessage } from '@/types/chat';
 import { chatApi } from '@/lib/api';
+import { Textarea } from './ui/textarea';
 
 interface ChatProps {
   onMessagesUpdate?: (messages: ChatMessage[]) => void;
@@ -13,8 +13,23 @@ interface ChatProps {
 export function Chat({ onMessagesUpdate }: ChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentVariant, setCurrentVariant] = useState<string>("default");
+  const [variantJson, setVariantJson] = useState<string>("");
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Add auto-resize effect
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = '0px';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [input]);
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -33,6 +48,8 @@ export function Chat({ onMessagesUpdate }: ChatProps) {
         messages: [...messages, userMessage],
       });
 
+      console.log('Response from API:', response);
+
       const assistantMessage: ChatMessage = {
         role: 'assistant',
         content: response.content,
@@ -41,6 +58,12 @@ export function Chat({ onMessagesUpdate }: ChatProps) {
       const updatedMessages = [...messages, userMessage, assistantMessage];
       setMessages(updatedMessages);
       setCurrentVariant(response.variant_id);
+      if (response.variant_json) {
+        console.log('Setting variant JSON:', response.variant_json);
+        setVariantJson(response.variant_json);
+      } else {
+        console.log('No variant JSON in response');
+      }
       
       // Notify parent about message updates
       onMessagesUpdate?.(updatedMessages);
@@ -55,8 +78,13 @@ export function Chat({ onMessagesUpdate }: ChatProps) {
   return (
     <Card className="flex flex-col h-full">
       <div className="p-2 border-b bg-muted/50">
-        <div className="text-sm text-muted-foreground">
-          Current Variant: <span className="font-medium">{currentVariant}</span>
+        <div className="text-sm text-muted-foreground space-y-1">
+          <div>Current Variant: <span className="font-medium">{currentVariant}</span></div>
+          {variantJson && (
+            <div className="text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-32">
+              {variantJson}
+            </div>
+          )}
         </div>
       </div>
       <ScrollArea className="flex-1 p-4">
@@ -76,8 +104,9 @@ export function Chat({ onMessagesUpdate }: ChatProps) {
         </div>
       </ScrollArea>
       <div className="p-4 border-t">
-        <div className="flex gap-2">
-          <Input
+        <div className="flex gap-2 items-end">
+          <Textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -88,6 +117,8 @@ export function Chat({ onMessagesUpdate }: ChatProps) {
             }}
             placeholder="Type a message..."
             disabled={isLoading}
+            className="min-h-[40px] max-h-[200px] resize-none overflow-hidden"
+            rows={1}
           />
           <Button onClick={sendMessage} disabled={isLoading}>
             Send

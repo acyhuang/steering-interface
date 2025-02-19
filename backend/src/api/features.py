@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from typing import List, Optional
 from ..models.chat import ChatMessage
-from ..models.features import FeatureActivation
+from ..models.features import FeatureActivation, SteerFeatureRequest, SteerFeatureResponse
 from ..core.services import EmberService
 from ..core.dependencies import get_ember_service
 from ..core.config import get_settings
@@ -37,4 +37,27 @@ async def inspect_features(
         
     except Exception as e:
         logger.error(f"Error during feature inspection: {str(e)}")
+        raise
+
+@router.post("/steer", response_model=SteerFeatureResponse)
+async def steer_feature(
+    request: SteerFeatureRequest,
+    ember_service: EmberService = Depends(get_ember_service)
+) -> SteerFeatureResponse:
+    """Steer a feature's activation value."""
+    logger.info(f"Received steering request for feature {request.feature_label}")
+    
+    try:
+        result = await ember_service.steer_feature(
+            session_id=request.session_id,
+            variant_id=request.variant_id,
+            feature_label=request.feature_label,
+            value=request.value
+        )
+        
+        logger.info(f"Successfully steered feature {request.feature_label}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error during feature steering: {str(e)}")
         raise 
