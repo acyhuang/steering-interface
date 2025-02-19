@@ -4,12 +4,17 @@ from ..models.chat import ChatMessage, ChatRequest, ChatResponse
 import logging
 from .config import Settings
 
+# Add logging configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 class EmberService:
     """Service for interacting with the Ember API.
     
-    This service manages a singleton client instance and provides methods
+    This service manages a single client instance and provides methods
     for all Ember API operations including chat, feature steering, and
     configuration management.
     """
@@ -50,7 +55,8 @@ class EmberService:
             Exception: If the API call fails
         """
         try:
-            logger.info(f"Creating chat completion with {len(messages)} messages")
+            # logger.info(f"Creating chat completion with {len(messages)} messages")
+            logger.info(f"(2 of 2) Creating chat completion")
             
             response = await self.client.chat.completions.create(
                 messages=[{"role": msg.role, "content": msg.content} for msg in messages],
@@ -62,7 +68,8 @@ class EmberService:
             )
             
             content = response.choices[0].message["content"] if response.choices else ""
-            logger.debug(f"Received response: {content[:100]}...")
+            # logger.debug(f"Received response: {content[:100]}...")
+            logger.debug(f"(Received response")
             
             return ChatResponse(content=content)
             

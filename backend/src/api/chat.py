@@ -27,7 +27,8 @@ async def create_chat_completion(
         HTTPException: If the request fails
     """
     try:
-        logger.info(f"Received chat request: {request}")
+        logger.info(f"(1 of 2) Received chat request")
+        # logger.info(f"Received chat request: {request}")
         
         response = await ember_service.create_chat_completion(
             messages=request.messages,

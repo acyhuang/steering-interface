@@ -43,40 +43,42 @@ export function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] w-full max-w-2xl mx-auto">
-        <ScrollArea className="h-[calc(100%-1rem)] absolute">
-          <div className="space-y-4">
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`${
-                  message.role === 'user' ? 'text-blue-600' : 'text-gray-700'
-                }`}
-              >
-                <div className="font-bold">{message.role}:</div>
-                <div className="whitespace-pre-wrap">{message.content}</div>
-              </div>
-            ))}
-            {isLoading && <div className="text-gray-500">Loading...</div>}
-          </div>
-        </ScrollArea>
-      <div className="flex gap-2">
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              sendMessage();
-            }
-          }}
-          placeholder="Type a message..."
-          disabled={isLoading}
-        />
-        <Button onClick={sendMessage} disabled={isLoading}>
-          Send
-        </Button>
+    <Card className="flex flex-col h-full">
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-4">
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={`${
+                message.role === 'user' ? 'text-blue-600' : 'text-gray-700'
+              }`}
+            >
+              <div className="font-bold">{message.role}:</div>
+              <div className="whitespace-pre-wrap">{message.content}</div>
+            </div>
+          ))}
+          {isLoading && <div className="text-gray-500">Loading...</div>}
+        </div>
+      </ScrollArea>
+      <div className="p-4 border-t">
+        <div className="flex gap-2">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
+            placeholder="Type a message..."
+            disabled={isLoading}
+          />
+          <Button onClick={sendMessage} disabled={isLoading}>
+            Send
+          </Button>
+        </div>
       </div>
-    </div>
+    </Card>
   );
 } 
