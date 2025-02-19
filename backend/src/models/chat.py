@@ -7,11 +7,11 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
-    model: str = Field(default="meta-llama/Llama-3.3-70B-Instruct")
-    stream: bool = Field(default=True)
-    max_completion_tokens: Optional[int] = Field(default=512)
-    temperature: Optional[float] = Field(default=0.6)
-    top_p: Optional[float] = Field(default=0.9)
+    variant_id: Optional[str] = None
+    max_completion_tokens: int = 512
+    temperature: float = 0.7
+    top_p: float = 0.9
 
 class ChatResponse(BaseModel):
-    content: str 
+    content: str
+    variant_id: str 

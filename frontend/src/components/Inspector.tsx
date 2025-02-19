@@ -3,20 +3,37 @@ import { Card } from "./ui/card"
 import { ScrollArea } from "./ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
 import { useState } from "react"
+import { Search } from "lucide-react"
+import { Button } from "./ui/button"
 
 export function Inspector() {
   const [searchQuery, setSearchQuery] = useState("")
   
+  const handleSearch = () => {
+    // TODO: Implement search functionality, console log doesn't work
+    console.log("Searching for:", searchQuery)
+  }
+
   return (
     <Card className="h-full p-4">
       <div className="flex flex-col h-full gap-4">
         <div className="flex flex-col gap-2">
           <h2 className="text-lg font-semibold">Feature Inspector</h2>
-          <Input
-            placeholder="Search features..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          <div className="flex gap-2">
+            <Input
+              placeholder="Search features..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch()
+                }
+              }}
+            />
+            <Button onClick={handleSearch} type="submit">
+              <Search className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="active" className="flex-1 flex flex-col">

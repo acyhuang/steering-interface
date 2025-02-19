@@ -8,6 +8,7 @@ import { chatApi } from '@/lib/api';
 
 export function Chat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [currentVariant, setCurrentVariant] = useState<string>("default");
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -34,6 +35,7 @@ export function Chat() {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+      setCurrentVariant(response.variant_id);
     } catch (error) {
       console.error('Failed to send message:', error);
       // TODO: Add error handling UI
@@ -44,6 +46,11 @@ export function Chat() {
 
   return (
     <Card className="flex flex-col h-full">
+      <div className="p-2 border-b bg-muted/50">
+        <div className="text-sm text-muted-foreground">
+          Current Variant: <span className="font-medium">{currentVariant}</span>
+        </div>
+      </div>
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           {messages.map((message, index) => (

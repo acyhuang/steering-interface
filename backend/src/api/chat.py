@@ -30,10 +30,13 @@ async def create_chat_completion(
         logger.info(f"(1 of 2) Received chat request")
         # logger.info(f"Received chat request: {request}")
         
+        # For now, use a simple session ID. Later we'll implement proper session management
+        session_id = "default_session"  # TODO: Implement proper session management
+        
         response = await ember_service.create_chat_completion(
             messages=request.messages,
-            model=request.model,
-            stream=False,
+            session_id=session_id,
+            variant_id=None,  # Use default variant
             max_completion_tokens=request.max_completion_tokens,
             temperature=request.temperature,
             top_p=request.top_p
