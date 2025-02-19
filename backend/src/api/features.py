@@ -3,6 +3,7 @@ from typing import List, Optional
 from ..models.chat import ChatMessage
 from ..models.features import FeatureActivation
 from ..core.services import EmberService
+from ..core.dependencies import get_ember_service
 from ..core.config import get_settings
 from pydantic import BaseModel
 import logging
@@ -19,7 +20,7 @@ class InspectFeaturesRequest(BaseModel):
 @router.post("/inspect", response_model=List[FeatureActivation])
 async def inspect_features(
     request: InspectFeaturesRequest,
-    ember_service: EmberService = Depends(lambda: EmberService(get_settings()))
+    ember_service: EmberService = Depends(get_ember_service)
 ) -> List[FeatureActivation]:
     """Inspect feature activations in the current conversation."""
     logger.info(f"(1 of 2) Received feature inspection request for session {request.session_id}")
