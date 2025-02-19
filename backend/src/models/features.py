@@ -28,4 +28,8 @@ class SteerFeatureResponse(BaseModel):
     """
     label: str
     activation: float
-    modified_value: float 
+    modified_value: float
+
+class ModifiedFeature(BaseModel):
+    label: str
+    value: float 

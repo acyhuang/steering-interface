@@ -1,5 +1,10 @@
 import { ChatMessage } from './chat';
 
+export interface ModifiedFeature {
+  label: string;
+  value: number;
+}
+
 export interface FeatureActivation {
   label: string;
   activation: number;

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
-from typing import List, Optional
+from typing import List, Optional, Dict
 from ..models.chat import ChatMessage
-from ..models.features import FeatureActivation, SteerFeatureRequest, SteerFeatureResponse
+from ..models.features import FeatureActivation, SteerFeatureRequest, SteerFeatureResponse, ModifiedFeature
 from ..core.services import EmberService
 from ..core.dependencies import get_ember_service
 from ..core.config import get_settings
@@ -60,4 +60,13 @@ async def steer_feature(
         
     except Exception as e:
         logger.error(f"Error during feature steering: {str(e)}")
-        raise 
+        raise
+
+@router.get("/modified", response_model=List[ModifiedFeature])
+async def get_modified_features(
+    session_id: str,
+    variant_id: Optional[str] = None,
+    ember_service: EmberService = Depends(get_ember_service)
+):
+    """Get list of modified features for a variant"""
+    return ember_service.get_modified_features(session_id, variant_id) 

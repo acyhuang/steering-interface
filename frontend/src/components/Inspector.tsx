@@ -5,8 +5,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
 import { useState, useEffect } from "react"
 import { Search } from "lucide-react"
 import { Button } from "./ui/button"
-import { FeatureActivation, SteerFeatureResponse } from "@/types/features"
+import { FeatureActivation, SteerFeatureResponse, ModifiedFeature } from "@/types/features"
 import { FeatureCard } from './FeatureCard'
+import { featuresApi } from "@/lib/api"
 
 interface InspectorProps {
   features?: FeatureActivation[];
@@ -16,19 +17,36 @@ interface InspectorProps {
 export function Inspector({ features, isLoading }: InspectorProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [localFeatures, setLocalFeatures] = useState(features || [])
+  const [modifiedFeatures, setModifiedFeatures] = useState<ModifiedFeature[]>([])
   
   useEffect(() => {
     setLocalFeatures(features || [])
   }, [features])
 
-  const handleSteer = (response: SteerFeatureResponse) => {
+  const fetchModifiedFeatures = async () => {
+    try {
+      const response = await featuresApi.getModifiedFeatures("default_session");
+      setModifiedFeatures(response);
+    } catch (error) {
+      console.error('Failed to fetch modified features:', error);
+    }
+  };
+
+  useEffect(() => {
+    // Fetch modified features when component mounts
+    fetchModifiedFeatures();
+  }, []);
+
+  const handleSteer = async (response: SteerFeatureResponse) => {
     setLocalFeatures(current => 
       current.map(f => 
         f.label === response.label 
           ? { ...f, activation: response.activation }
           : f
       )
-    )
+    );
+    // Fetch updated modified features after steering
+    await fetchModifiedFeatures();
   }
 
   const handleSearch = () => {
@@ -76,6 +94,7 @@ export function Inspector({ features, isLoading }: InspectorProps) {
                       key={index} 
                       feature={feature}
                       onSteer={handleSteer}
+                      onFeatureModified={fetchModifiedFeatures}
                     />
                   ))}
                 </div>
@@ -93,9 +112,25 @@ export function Inspector({ features, isLoading }: InspectorProps) {
             </TabsContent>
 
             <TabsContent value="modified" className="m-0">
-              <div className="text-sm text-gray-500">
-                No features have been modified.
-              </div>
+              {modifiedFeatures.length > 0 ? (
+                <div className="space-y-2">
+                  {modifiedFeatures.map((feature, index) => (
+                    <FeatureCard 
+                      key={index}
+                      feature={{
+                        label: feature.label,
+                        activation: 0 // Not needed for modified view
+                      }}
+                      modification={feature.value}
+                      readOnly
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">
+                  No features have been modified.
+                </div>
+              )}
             </TabsContent>
           </ScrollArea>
         </Tabs>

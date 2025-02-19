@@ -207,3 +207,13 @@ class EmberService:
         except Exception as e:
             logger.error(f"Error in steer_feature: {str(e)}")
             raise 
+
+    def get_modified_features(self, session_id: str, variant_id: Optional[str] = None) -> List[Dict]:
+        """Get list of modified features from variant."""
+        variant = self.get_variant(session_id, variant_id)
+        variant_data = variant.json()
+        
+        return [{
+            'label': edit['feature_label'],
+            'value': edit['value']
+        } for edit in variant_data.get('edits', [])] 
