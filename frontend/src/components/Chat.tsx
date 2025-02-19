@@ -43,23 +43,23 @@ export function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-[600px] w-full max-w-2xl mx-auto">
-      <Card className="flex-1 p-4 mb-4">
-        <ScrollArea className="h-full">
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`mb-4 ${
-                message.role === 'user' ? 'text-blue-600' : 'text-gray-700'
-              }`}
-            >
-              <div className="font-bold">{message.role}:</div>
-              <div className="whitespace-pre-wrap">{message.content}</div>
-            </div>
-          ))}
-          {isLoading && <div className="text-gray-500">Loading...</div>}
+    <div className="flex flex-col h-[calc(100vh-8rem)] w-full max-w-2xl mx-auto">
+        <ScrollArea className="h-[calc(100%-1rem)] absolute">
+          <div className="space-y-4">
+            {messages.map((message, index) => (
+              <div
+                key={index}
+                className={`${
+                  message.role === 'user' ? 'text-blue-600' : 'text-gray-700'
+                }`}
+              >
+                <div className="font-bold">{message.role}:</div>
+                <div className="whitespace-pre-wrap">{message.content}</div>
+              </div>
+            ))}
+            {isLoading && <div className="text-gray-500">Loading...</div>}
+          </div>
         </ScrollArea>
-      </Card>
       <div className="flex gap-2">
         <Input
           value={input}
