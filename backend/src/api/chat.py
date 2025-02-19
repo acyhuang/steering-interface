@@ -1,43 +1,44 @@
 from typing import AsyncGenerator
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-import goodfire
-from goodfire import AsyncClient
-import asyncio
-from ..core.config import Settings, get_settings
+from ..core.services import EmberService
+from ..core.dependencies import get_ember_service
 from ..models.chat import ChatRequest, ChatMessage, ChatResponse
 import logging
 
 router = APIRouter()
-
 logger = logging.getLogger(__name__)
 
 @router.post("/chat/completions")
 async def create_chat_completion(
     request: ChatRequest,
-    settings: Settings = Depends(get_settings)
+    ember_service: EmberService = Depends(get_ember_service)
 ) -> ChatResponse:
-    # Initialize Goodfire client with validated key
-    client = AsyncClient(settings.get_ember_api_key)
+    """Create a chat completion.
     
+    Args:
+        request: Chat completion request
+        ember_service: Injected EmberService instance
+        
+    Returns:
+        ChatResponse containing the model's response
+        
+    Raises:
+        HTTPException: If the request fails
+    """
     try:
         logger.info(f"Received chat request: {request}")
         
-        # Call the Goodfire API for a non-streaming response
-        response = await client.chat.completions.create(
-            messages=[{"role": msg.role, "content": msg.content} for msg in request.messages],
+        response = await ember_service.create_chat_completion(
+            messages=request.messages,
             model=request.model,
-            stream=False,  # Set stream to False for non-streaming
+            stream=False,
             max_completion_tokens=request.max_completion_tokens,
             temperature=request.temperature,
             top_p=request.top_p
         )
         
-        # Extract the content from the response
-        content = response.choices[0].message["content"] if response.choices else ""
-        
-        # Return in the format expected by frontend
-        return ChatResponse(content=content)
+        return response
         
     except Exception as e:
         logger.error(f"Error processing chat request: {str(e)}")
