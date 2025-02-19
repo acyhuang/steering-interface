@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .api import chat
+from .api import chat, features
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,6 +21,13 @@ app.include_router(
     chat.router, 
     prefix="/api/v1",
     tags=["chat"]
+)
+
+# Add features router
+app.include_router(
+    features.router,
+    prefix="/api/v1",
+    tags=["features"]
 )
 
 # Add a test route to verify the server is working

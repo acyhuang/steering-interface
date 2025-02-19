@@ -1,17 +1,14 @@
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant';
   content: string;
 }
 
 export interface ChatRequest {
   messages: ChatMessage[];
-  model?: string;
-  stream?: boolean;
-  max_completion_tokens?: number;
-  temperature?: number;
-  top_p?: number;
+  variant_id?: string;
 }
 
 export interface ChatResponse {
   content: string;
+  variant_id: string;
 } 

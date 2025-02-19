@@ -3,6 +3,9 @@ import { ConnectionStatus } from "@/components/ConnectionStatus"
 import { Inspector } from "@/components/Inspector"
 import Split from 'react-split'
 import { useEffect, useState } from "react"
+import { FeatureActivation } from "./types/features"
+import { ChatMessage } from "./types/chat"
+import { featuresApi } from "@/lib/api"
 
 function App() {
   // Store split sizes in localStorage to persist user preference
@@ -11,10 +14,28 @@ function App() {
     return saved ? JSON.parse(saved) : [75, 25] // default split: 75% chat, 25% inspector
   })
 
+  const [features, setFeatures] = useState<FeatureActivation[]>([])
+  const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
+
   // Save sizes when they change
   useEffect(() => {
     localStorage.setItem('split-sizes', JSON.stringify(sizes))
   }, [sizes])
+
+  const handleMessagesUpdate = async (messages: ChatMessage[]) => {
+    setIsLoadingFeatures(true)
+    try {
+      const response = await featuresApi.inspectFeatures({
+        messages,
+        session_id: "default" // TODO: Use real session management
+      })
+      setFeatures(response)
+    } catch (error) {
+      console.error("Failed to inspect features:", error)
+    } finally {
+      setIsLoadingFeatures(false)
+    }
+  }
 
   return (
     <div className="h-screen flex flex-col">
@@ -34,10 +55,10 @@ function App() {
         })}
       >
         <div className="h-full">
-          <Chat />
+          <Chat onMessagesUpdate={handleMessagesUpdate} />
         </div>
         <div className="h-full">
-          <Inspector />
+          <Inspector features={features} isLoading={isLoadingFeatures} />
         </div>
       </Split>
     </div>

@@ -1,14 +1,18 @@
 from typing import AsyncGenerator, List, Optional, Dict
 from goodfire import AsyncClient, Variant
 from ..models.chat import ChatMessage, ChatRequest, ChatResponse
+from ..models.features import FeatureActivation
 import logging
 from .config import Settings
 
-# Add logging configuration
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+# Set httpx logger to WARNING to reduce noise
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 class EmberService:
@@ -126,20 +130,25 @@ class EmberService:
             logger.error(f"Error in create_chat_completion: {str(e)}")
             raise 
 
-    # async def inspect_features(
-    #     self,
-    #     messages: List[ChatMessage],
-    #     session_id: str,
-    #     variant_id: Optional[str] = None,
-    # ) -> List[FeatureActivation]:
-    #     """Inspect feature activations in the current conversation."""
-    #     variant = self.get_variant(session_id, variant_id)
-        
-    #     inspector = await self.client.features.inspect(
-    #         messages=[{"role": msg.role, "content": msg.content} for msg in messages],
-    #         model=variant
-    #     )
-        
-    #     return [
-    #         activation for activation in inspector.top(k=20)
-    #     ] 
+    async def inspect_features(self, messages: List[ChatMessage], session_id: str, variant_id: Optional[str] = None) -> List[FeatureActivation]:
+        """Inspect feature activations in the current conversation."""
+        try:
+            variant = self.get_variant(session_id, variant_id)
+            
+            inspector = await self.client.features.inspect(
+                messages=[{"role": msg.role, "content": msg.content} for msg in messages],
+                model=variant
+            )
+            
+            activations = []
+            for activation in inspector.top(k=10):
+                activations.append(FeatureActivation(
+                    label=activation.feature.label,
+                    activation=activation.activation
+                ))
+            
+            return activations
+            
+        except Exception as e:
+            logger.error(f"Error in inspect_features: {str(e)}")
+            raise 

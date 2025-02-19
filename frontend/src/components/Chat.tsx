@@ -6,7 +6,11 @@ import { ScrollArea } from './ui/scroll-area';
 import { ChatMessage } from '@/types/chat';
 import { chatApi } from '@/lib/api';
 
-export function Chat() {
+interface ChatProps {
+  onMessagesUpdate?: (messages: ChatMessage[]) => void;
+}
+
+export function Chat({ onMessagesUpdate }: ChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentVariant, setCurrentVariant] = useState<string>("default");
   const [input, setInput] = useState('');
@@ -34,8 +38,12 @@ export function Chat() {
         content: response.content,
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      const updatedMessages = [...messages, userMessage, assistantMessage];
+      setMessages(updatedMessages);
       setCurrentVariant(response.variant_id);
+      
+      // Notify parent about message updates
+      onMessagesUpdate?.(updatedMessages);
     } catch (error) {
       console.error('Failed to send message:', error);
       // TODO: Add error handling UI
