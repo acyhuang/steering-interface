@@ -45,6 +45,14 @@ export function Inspector({ features, isLoading }: InspectorProps) {
           : f
       )
     );
+
+    // Regenerate the last message after steering
+    // @ts-ignore
+    if (window.regenerateLastMessage) {
+      // @ts-ignore
+      await window.regenerateLastMessage();
+    }
+
     // Fetch updated modified features after steering
     await fetchModifiedFeatures();
   }
@@ -76,63 +84,65 @@ export function Inspector({ features, isLoading }: InspectorProps) {
           </div>
         </div>
 
-        <Tabs defaultValue="activated" className="flex-1 flex flex-col">
+        <Tabs defaultValue="activated" className="flex-1 flex flex-col min-h-0">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="activated">Activated</TabsTrigger>
             <TabsTrigger value="suggested">Suggested</TabsTrigger>
             <TabsTrigger value="modified">Modified</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 mt-4">
-            <TabsContent value="activated" className="m-0">
-              {isLoading ? (
-                <div className="text-sm text-gray-500">Loading features...</div>
-              ) : localFeatures && localFeatures.length > 0 ? (
-                <div className="space-y-2">
-                  {localFeatures.map((feature, index) => (
-                    <FeatureCard 
-                      key={index} 
-                      feature={feature}
-                      onSteer={handleSteer}
-                      onFeatureModified={fetchModifiedFeatures}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">
-                  No activated features. Start a conversation to see features in use.
-                </div>
-              )}
-            </TabsContent>
+          <div className="flex-1 min-h-0 mt-4">
+            <ScrollArea className="h-[calc(100vh-240px)]">
+              <TabsContent value="activated" className="m-0">
+                {isLoading ? (
+                  <div className="text-sm text-gray-500">Loading features...</div>
+                ) : localFeatures && localFeatures.length > 0 ? (
+                  <div className="space-y-2 pr-4">
+                    {localFeatures.map((feature, index) => (
+                      <FeatureCard 
+                        key={index} 
+                        feature={feature}
+                        onSteer={handleSteer}
+                        onFeatureModified={fetchModifiedFeatures}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">
+                    No activated features. Start a conversation to see features in use.
+                  </div>
+                )}
+              </TabsContent>
 
-            <TabsContent value="suggested" className="m-0">
-              <div className="text-sm text-gray-500">
-                No suggested features available yet.
-              </div>
-            </TabsContent>
-
-            <TabsContent value="modified" className="m-0">
-              {modifiedFeatures.length > 0 ? (
-                <div className="space-y-2">
-                  {modifiedFeatures.map((feature, index) => (
-                    <FeatureCard 
-                      key={index}
-                      feature={{
-                        label: feature.label,
-                        activation: 0 // Not needed for modified view
-                      }}
-                      modification={feature.value}
-                      readOnly
-                    />
-                  ))}
-                </div>
-              ) : (
+              <TabsContent value="suggested" className="m-0">
                 <div className="text-sm text-gray-500">
-                  No features have been modified.
+                  No suggested features available yet.
                 </div>
-              )}
-            </TabsContent>
-          </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="modified" className="m-0">
+                {modifiedFeatures.length > 0 ? (
+                  <div className="space-y-2 pr-4">
+                    {modifiedFeatures.map((feature, index) => (
+                      <FeatureCard 
+                        key={index}
+                        feature={{
+                          label: feature.label,
+                          activation: 0
+                        }}
+                        modification={feature.value}
+                        readOnly
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">
+                    No features have been modified.
+                  </div>
+                )}
+              </TabsContent>
+            </ScrollArea>
+          </div>
         </Tabs>
       </div>
     </Card>

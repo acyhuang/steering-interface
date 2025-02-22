@@ -16,6 +16,7 @@ export function Chat({ onMessagesUpdate }: ChatProps) {
   const [variantJson, setVariantJson] = useState<string>("");
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Add auto-resize effect
@@ -75,6 +76,56 @@ export function Chat({ onMessagesUpdate }: ChatProps) {
     }
   };
 
+  const regenerateLastMessage = async () => {
+    if (messages.length < 2) return;
+
+    setIsLoading(true);
+    setIsRegenerating(true);
+    
+    // Get all messages up to the last user message
+    const lastUserIndex = [...messages].reverse().findIndex(m => m.role === 'user');
+    if (lastUserIndex === -1) return;
+    
+    const contextMessages = messages.slice(0, messages.length - lastUserIndex);
+    
+    // Remove the last assistant message immediately
+    setMessages(contextMessages);
+
+    try {
+      const response = await chatApi.createChatCompletion({
+        messages: contextMessages,
+      });
+
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: response.content,
+      };
+
+      // Add the new assistant message
+      const updatedMessages = [...contextMessages, assistantMessage];
+      setMessages(updatedMessages);
+      setCurrentVariant(response.variant_id);
+      if (response.variant_json) {
+        setVariantJson(response.variant_json);
+      }
+      
+      onMessagesUpdate?.(updatedMessages);
+    } catch (error) {
+      console.error('Failed to regenerate message:', error);
+    } finally {
+      setIsLoading(false);
+      setIsRegenerating(false);
+    }
+  };
+
+  // Expose regenerateLastMessage to parent components
+  useEffect(() => {
+    if (window) {
+      // @ts-ignore
+      window.regenerateLastMessage = regenerateLastMessage;
+    }
+  }, [messages]);
+
   return (
     <Card className="flex flex-col h-full">
       <div className="p-2 border-b bg-muted/50">
@@ -92,15 +143,26 @@ export function Chat({ onMessagesUpdate }: ChatProps) {
           {messages.map((message, index) => (
             <div
               key={index}
-              className={`${
-                message.role === 'user' ? 'text-blue-600' : 'text-gray-700'
-              }`}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div className="font-bold">{message.role}:</div>
-              <div className="whitespace-pre-wrap">{message.content}</div>
+              <div
+                className={`${
+                  message.role === 'user'
+                    ? 'bg-gray-100 rounded-lg px-3 py-2 max-w-[80%]'
+                    : 'max-w-[90%]'
+                } ${
+                  message.role === 'user' ? 'text-gray-700' : 'text-gray-700'
+                }`}
+              >
+                <div className="whitespace-pre-wrap">{message.content}</div>
+              </div>
             </div>
           ))}
-          {isLoading && <div className="text-gray-500">Loading...</div>}
+          {isLoading && (
+            <div className="text-gray-500">
+              {isRegenerating ? "Regenerating..." : "Loading..."}
+            </div>
+          )}
         </div>
       </ScrollArea>
       <div className="p-4 border-t">
