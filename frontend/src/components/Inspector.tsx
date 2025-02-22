@@ -8,6 +8,8 @@ import { Button } from "./ui/button"
 import { FeatureActivation, SteerFeatureResponse, ModifiedFeature } from "@/types/features"
 import { FeatureCard } from './FeatureCard'
 import { featuresApi } from "@/lib/api"
+import { ContinuousFeatureCard } from './ContinuousFeatureCard'
+import { useFeatureCardVariant } from './FeatureCardVariants'
 
 interface InspectorProps {
   features?: FeatureActivation[];
@@ -19,6 +21,8 @@ export function Inspector({ features, isLoading }: InspectorProps) {
   const [localFeatures, setLocalFeatures] = useState(features || [])
   const [modifiedFeatures, setModifiedFeatures] = useState<ModifiedFeature[]>([])
   
+  const FeatureCardVariant = useFeatureCardVariant();
+
   useEffect(() => {
     setLocalFeatures(features || [])
   }, [features])
@@ -99,7 +103,7 @@ export function Inspector({ features, isLoading }: InspectorProps) {
                 ) : localFeatures && localFeatures.length > 0 ? (
                   <div className="space-y-2 pr-4">
                     {localFeatures.map((feature, index) => (
-                      <FeatureCard 
+                      <FeatureCardVariant
                         key={index} 
                         feature={feature}
                         onSteer={handleSteer}
