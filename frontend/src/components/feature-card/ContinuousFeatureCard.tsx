@@ -12,22 +12,26 @@ export function ContinuousFeatureCard({
   feature, 
   onSteer, 
   onFeatureModified,
-  readOnly 
+  readOnly,
+  variantId = "default",
+  testId  // Keep testId for TestBench but don't use it for model operations
 }: FeatureCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { getModification, setModification } = useFeatureModifications();
   
-  // Initialize slider with existing modification or 0
+  // Initialize slider with existing modification or 0 (neutral position)
   const [sliderValue, setSliderValue] = useState<number[]>(() => {
     const existingMod = getModification(feature.label);
-    return [existingMod ?? 0];
+    return [existingMod ?? 0]; // Default to 0 if no modification exists
   });
 
   // Update slider when modifications change externally
   useEffect(() => {
     const mod = getModification(feature.label);
-    if (mod !== undefined && mod !== sliderValue[0]) {
+    if (mod !== undefined) {
       setSliderValue([mod]);
+    } else {
+      setSliderValue([0]); // Reset to neutral position when modification is cleared
     }
   }, [feature.label, getModification]);
 
@@ -43,11 +47,13 @@ export function ContinuousFeatureCard({
       const steeringValue = newValue[0];
       logger.debug('Steering feature', { 
         feature: feature.label, 
-        value: steeringValue 
+        value: steeringValue,
+        variantId
       });
 
       const response = await featuresApi.steerFeature({
-        session_id: "default_session",
+        session_id: variantId,
+        variant_id: variantId,
         feature_label: feature.label,
         value: steeringValue
       });
@@ -97,7 +103,6 @@ export function ContinuousFeatureCard({
             onValueChange={handleValueChange}
             onValueCommit={handleValueCommit}
             disabled={isLoading}
-            className={modification !== undefined ? "bg-blue-100" : ""}
           />
         )}
       </div>

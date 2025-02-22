@@ -88,30 +88,13 @@ class EmberService:
         temperature: Optional[float] = 0.7,
         top_p: Optional[float] = 0.9
     ) -> ChatResponse:
-        """Create a chat completion using the Ember API.
-        
-        Args:
-            messages: List of chat messages
-            session_id: Session ID
-            variant_id: Variant ID
-            stream: Whether to stream the response
-            max_completion_tokens: Maximum tokens in completion
-            temperature: Sampling temperature
-            top_p: Nucleus sampling parameter
-            
-        Returns:
-            ChatResponse containing the model's response
-            
-        Raises:
-            Exception: If the API call fails
-        """
+        """Create a chat completion using the Ember API."""
         try:
             logger.info(f"Creating chat completion for variant {variant_id}")
             
             variant = self.get_variant(session_id, variant_id)
-            # Convert the dictionary to a JSON string
-            variant_json = json.dumps(variant.json(), indent=2)
-            logger.info(f"Variant JSON: {variant_json}")
+            variant_json = variant.json()
+            logger.info(f"Variant JSON: {json.dumps(variant_json, indent=2)}")
             
             response = await self.client.chat.completions.create(
                 messages=[{"role": msg.role, "content": msg.content} for msg in messages],
@@ -127,12 +110,12 @@ class EmberService:
             return ChatResponse(
                 content=content,
                 variant_id=variant_id or "default",
-                variant_json=variant_json
+                variant_json=json.dumps(variant_json)  # Convert dict to JSON string
             )
             
         except Exception as e:
             logger.error(f"Error in create_chat_completion: {str(e)}")
-            raise 
+            raise
 
     async def inspect_features(self, messages: List[ChatMessage], session_id: str, variant_id: Optional[str] = None) -> List[FeatureActivation]:
         """Inspect feature activations in the current conversation."""
@@ -166,7 +149,9 @@ class EmberService:
     ) -> SteerFeatureResponse:
         """Steer a feature's activation value."""
         try:
+            logger.info(f"[VARIANT_DEBUG] Steering feature for session={session_id}, variant={variant_id}")
             variant = self.get_variant(session_id, variant_id)
+            logger.info(f"[VARIANT_DEBUG] Pre-steering variant state: {json.dumps(variant.json(), indent=2)}")
             
             # Search for the feature
             features = await self.client.features.search(
@@ -182,6 +167,7 @@ class EmberService:
             
             # Apply the steering
             variant.set(feature, value)
+            logger.info(f"[VARIANT_DEBUG] Post-steering variant state: {json.dumps(variant.json(), indent=2)}")
             
             # Return response with the values we set
             return SteerFeatureResponse(
@@ -194,12 +180,18 @@ class EmberService:
             logger.error(f"Error in steer_feature: {str(e)}")
             raise 
 
-    def get_modified_features(self, session_id: str, variant_id: Optional[str] = None) -> List[Dict]:
-        """Get list of modified features from variant."""
-        variant = self.get_variant(session_id, variant_id)
-        variant_data = variant.json()
+    def get_modified_features(self, session_id: str, variant_id: Optional[str] = None) -> Dict:
+        """Get the variant's raw JSON state.
         
-        return [{
-            'label': edit['feature_label'],
-            'value': edit['value']
-        } for edit in variant_data.get('edits', [])] 
+        Returns the complete variant JSON which includes all modifications and settings.
+        """
+        try:
+            logger.info(f"[VARIANT_DEBUG] Getting modified features for session={session_id}, variant={variant_id}")
+            variant = self.get_variant(session_id, variant_id)
+            variant_json = variant.json()
+            logger.info(f"[VARIANT_DEBUG] Current variant state: {json.dumps(variant_json, indent=2)}")
+            return variant_json  # Return raw dict for API endpoint
+            
+        except Exception as e:
+            logger.error(f"Error getting variant JSON: {str(e)}")
+            raise 

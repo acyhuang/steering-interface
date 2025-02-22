@@ -2,8 +2,8 @@ import { ComponentType } from 'react';
 import { DiscreteFeatureCard } from './DiscreteFeatureCard';
 import { ContinuousFeatureCard } from './ContinuousFeatureCard';
 import { FeatureActivation, SteerFeatureResponse } from "@/types/features"
-import { useVariant } from '@/lib/variants/useVariant';
-import { VariantDefinition } from '@/lib/variants/types';
+import { useTestBench } from '@/lib/testbench/useTestBench';
+import { TestDefinition } from '@/lib/testbench/types';
 
 // Shared interface for both variants
 export interface FeatureCardProps {
@@ -12,28 +12,30 @@ export interface FeatureCardProps {
   onFeatureModified?: () => void;
   modification?: number;
   readOnly?: boolean;
+  variantId?: string;  // For model behavior modifications
+  testId?: string;     // Only used by TestBench for UI component testing
 }
 
-const discreteVariant: VariantDefinition<FeatureCardProps> = {
+const discreteTest: TestDefinition<FeatureCardProps> = {
   id: 'discrete',
   name: 'Discrete Controls',
   component: DiscreteFeatureCard
 };
 
-const continuousVariant: VariantDefinition<FeatureCardProps> = {
+const continuousTest: TestDefinition<FeatureCardProps> = {
   id: 'continuous',
   name: 'Continuous Controls',
   component: ContinuousFeatureCard
 };
 
-export const featureCardVariants = {
-  discrete: discreteVariant,
-  continuous: continuousVariant
+export const featureCardTests = {
+  discrete: discreteTest,
+  continuous: continuousTest
 };
 
 export function useFeatureCardVariant(): ComponentType<FeatureCardProps> {
-  const discreteComponent = useVariant('featureCard', discreteVariant);
-  const continuousComponent = useVariant('featureCard', continuousVariant);
+  const discreteComponent = useTestBench('featureCard', discreteTest);
+  const continuousComponent = useTestBench('featureCard', continuousTest);
   
   return discreteComponent;
 } 

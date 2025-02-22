@@ -7,8 +7,8 @@ import { FeatureActivation } from "./types/features"
 import { ChatMessage } from "./types/chat"
 import { featuresApi } from "@/lib/api"
 import { createLogger } from "@/lib/logger"
-import { VariantProvider } from "@/lib/variants/VariantProvider"
-import { VariantControlPanel } from "@/lib/variants/VariantControlPanel"
+import { TestBenchProvider } from "@/lib/testbench/TestBenchProvider"
+import { TestBenchPanel } from "@/lib/testbench/TestBenchPanel"
 import { FeatureProvider } from "@/contexts/FeatureContext"
 
 const logger = createLogger('App')
@@ -22,6 +22,7 @@ function App() {
 
   const [features, setFeatures] = useState<FeatureActivation[]>([])
   const [isLoadingFeatures, setIsLoadingFeatures] = useState(false)
+  const [currentTestId, setCurrentTestId] = useState<string>("default")
 
   // Save sizes when they change
   useEffect(() => {
@@ -48,12 +49,16 @@ function App() {
     }
   }
 
+  const handleTestChange = (testId: string) => {
+    setCurrentTestId(testId)
+  }
+
   return (
     <FeatureProvider>
-      <VariantProvider>
+      <TestBenchProvider>
         <div className="h-screen flex flex-col">
           <div className="p-4 flex justify-between items-center">
-            <VariantControlPanel />
+            <TestBenchPanel />
             <ConnectionStatus />
           </div>
           <Split 
@@ -68,14 +73,21 @@ function App() {
             })}
           >
             <div className="h-full">
-              <Chat onMessagesUpdate={handleMessagesUpdate} />
+              <Chat 
+                onMessagesUpdate={handleMessagesUpdate}
+                onTestChange={handleTestChange}
+              />
             </div>
             <div className="h-full">
-              <Inspector features={features} isLoading={isLoadingFeatures} />
+              <Inspector 
+                features={features} 
+                isLoading={isLoadingFeatures}
+                testId={currentTestId}
+              />
             </div>
           </Split>
         </div>
-      </VariantProvider>
+      </TestBenchProvider>
     </FeatureProvider>
   )
 }

@@ -2,23 +2,25 @@ import { Input } from "./ui/input"
 import { Card } from "./ui/card"
 import { ScrollArea } from "./ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Search } from "lucide-react"
 import { Button } from "./ui/button"
 import { FeatureActivation, SteerFeatureResponse } from "@/types/features"
 import { featuresApi } from "@/lib/api"
 import { useFeatureCardVariant, ContinuousFeatureCard } from './feature-card'
-import { useFeatureModifications } from "@/contexts/FeatureContext"
 
 interface InspectorProps {
   features?: FeatureActivation[];
   isLoading?: boolean;
+  variantId?: string;
 }
 
-export function Inspector({ features, isLoading }: InspectorProps) {
+export function Inspector({ features, isLoading, variantId = "default" }: InspectorProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [localFeatures, setLocalFeatures] = useState(features || [])
-  const { modifications } = useFeatureModifications()
+  const [variantJson, setVariantJson] = useState<any>(null)
+  const [isLoadingModified, setIsLoadingModified] = useState(false)
+  const [selectedTab, setSelectedTab] = useState("activated")
   
   const FeatureCardVariant = useFeatureCardVariant();
 
@@ -26,7 +28,38 @@ export function Inspector({ features, isLoading }: InspectorProps) {
     setLocalFeatures(features || [])
   }, [features])
 
+  const fetchVariantJson = useCallback(async () => {
+    setIsLoadingModified(true)
+    console.log('[INSPECTOR_DEBUG] Fetching modified features for variant:', variantId);
+    try {
+      const response = await featuresApi.getModifiedFeatures(variantId);
+      console.log('[INSPECTOR_DEBUG] Received variant state:', response);
+      setVariantJson(response);
+    } catch (error) {
+      console.error('[INSPECTOR_DEBUG] Failed to fetch variant state:', error);
+    } finally {
+      setIsLoadingModified(false)
+    }
+  }, [variantId]);
+
+  useEffect(() => {
+    console.log('[INSPECTOR_DEBUG] Tab or variant changed - selectedTab:', selectedTab, 'variantId:', variantId);
+    if (selectedTab === "modified") {
+      fetchVariantJson();
+    }
+  }, [selectedTab, fetchVariantJson]);
+
   const handleSteer = async (response: SteerFeatureResponse) => {
+    console.log('[INSPECTOR_DEBUG] Handling steer response:', response);
+    
+    const steerRequest = {
+      session_id: variantId,
+      variant_id: variantId,
+      feature_label: response.label,
+      value: response.activation
+    };
+    console.log('[INSPECTOR_DEBUG] Making steer request with:', steerRequest);
+    
     setLocalFeatures(current => 
       current.map(f => 
         f.label === response.label 
@@ -34,6 +67,11 @@ export function Inspector({ features, isLoading }: InspectorProps) {
           : f
       )
     );
+
+    if (selectedTab === "modified") {
+      console.log('[INSPECTOR_DEBUG] On modified tab, fetching updated variant state');
+      await fetchVariantJson();
+    }
 
     // Regenerate the last message after steering
     // @ts-ignore
@@ -47,12 +85,6 @@ export function Inspector({ features, isLoading }: InspectorProps) {
     // TODO: Implement search functionality
     console.log("Searching for:", searchQuery)
   }
-
-  // Convert modifications Map to array for Modified tab
-  const modifiedFeatures = Array.from(modifications.entries()).map(([label, value]) => ({
-    label,
-    value
-  }));
 
   return (
     <Card className="h-full p-4">
@@ -76,7 +108,12 @@ export function Inspector({ features, isLoading }: InspectorProps) {
           </div>
         </div>
 
-        <Tabs defaultValue="activated" className="flex-1 flex flex-col min-h-0">
+        <Tabs 
+          defaultValue="activated" 
+          className="flex-1 flex flex-col min-h-0"
+          value={selectedTab}
+          onValueChange={setSelectedTab}
+        >
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="activated">Activated</TabsTrigger>
             <TabsTrigger value="suggested">Suggested</TabsTrigger>
@@ -95,6 +132,7 @@ export function Inspector({ features, isLoading }: InspectorProps) {
                         key={index} 
                         feature={feature}
                         onSteer={handleSteer}
+                        variantId={variantId}
                       />
                     ))}
                   </div>
@@ -112,22 +150,17 @@ export function Inspector({ features, isLoading }: InspectorProps) {
               </TabsContent>
 
               <TabsContent value="modified" className="m-0">
-                {modifiedFeatures.length > 0 ? (
+                {isLoadingModified ? (
+                  <div className="text-sm text-gray-500">Loading variant state...</div>
+                ) : variantJson ? (
                   <div className="space-y-2 pr-4">
-                    {modifiedFeatures.map((feature, index) => (
-                      <ContinuousFeatureCard 
-                        key={index}
-                        feature={{
-                          label: feature.label,
-                          activation: feature.value  // Use the actual modification value
-                        }}
-                        readOnly
-                      />
-                    ))}
+                    <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto">
+                      {JSON.stringify(variantJson, null, 2)}
+                    </pre>
                   </div>
                 ) : (
                   <div className="text-sm text-gray-500">
-                    No features have been modified.
+                    No variant state available.
                   </div>
                 )}
               </TabsContent>

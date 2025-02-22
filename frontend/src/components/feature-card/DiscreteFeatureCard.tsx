@@ -14,7 +14,9 @@ export function DiscreteFeatureCard({
   feature, 
   onSteer, 
   onFeatureModified, 
-  readOnly 
+  readOnly,
+  variantId = "default",
+  testId  // Keep testId for TestBench but don't use it for model operations
 }: FeatureCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { getModification, setModification } = useFeatureModifications();
@@ -25,8 +27,15 @@ export function DiscreteFeatureCard({
 
     setIsLoading(true);
     try {
+      logger.debug('Steering feature', { 
+        feature: feature.label, 
+        value,
+        variantId
+      });
+
       const response = await featuresApi.steerFeature({
-        session_id: "default_session",
+        session_id: variantId,
+        variant_id: variantId,
         feature_label: feature.label,
         value: value
       });

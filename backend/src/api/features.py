@@ -45,6 +45,7 @@ async def steer_feature(
     ember_service: EmberService = Depends(get_ember_service)
 ) -> SteerFeatureResponse:
     """Steer a feature's activation value."""
+    logger.info(f"[API_DEBUG] steer_feature called with session_id={request.session_id}, variant_id={request.variant_id}")
     logger.info(f"Received steering request for feature {request.feature_label}")
     
     try:
@@ -62,11 +63,12 @@ async def steer_feature(
         logger.error(f"Error during feature steering: {str(e)}")
         raise
 
-@router.get("/modified", response_model=List[ModifiedFeature])
+@router.get("/modified")
 async def get_modified_features(
     session_id: str,
     variant_id: Optional[str] = None,
     ember_service: EmberService = Depends(get_ember_service)
-):
-    """Get list of modified features for a variant"""
+) -> Dict:
+    """Get raw variant JSON state"""
+    logger.info(f"[API_DEBUG] get_modified_features called with session_id={session_id}, variant_id={variant_id}")
     return ember_service.get_modified_features(session_id, variant_id) 
