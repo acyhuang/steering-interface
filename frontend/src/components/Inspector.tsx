@@ -6,10 +6,8 @@ import { useState, useEffect } from "react"
 import { Search } from "lucide-react"
 import { Button } from "./ui/button"
 import { FeatureActivation, SteerFeatureResponse, ModifiedFeature } from "@/types/features"
-import { FeatureCard } from './FeatureCard'
 import { featuresApi } from "@/lib/api"
-import { ContinuousFeatureCard } from './ContinuousFeatureCard'
-import { useFeatureCardVariant } from './FeatureCardVariants'
+import { useFeatureCardVariant, DiscreteFeatureCard } from './feature-card'
 
 interface InspectorProps {
   features?: FeatureActivation[];
@@ -128,7 +126,7 @@ export function Inspector({ features, isLoading }: InspectorProps) {
                 {modifiedFeatures.length > 0 ? (
                   <div className="space-y-2 pr-4">
                     {modifiedFeatures.map((feature, index) => (
-                      <FeatureCard 
+                      <DiscreteFeatureCard 
                         key={index}
                         feature={{
                           label: feature.label,

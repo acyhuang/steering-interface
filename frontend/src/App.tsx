@@ -50,7 +50,8 @@ function App() {
   return (
     <VariantProvider>
       <div className="h-screen flex flex-col">
-        <div className="p-4">
+        <div className="p-4 flex justify-between items-center">
+          <VariantControlPanel />
           <ConnectionStatus />
         </div>
         <Split 
@@ -71,7 +72,6 @@ function App() {
             <Inspector features={features} isLoading={isLoadingFeatures} />
           </div>
         </Split>
-        {process.env.NODE_ENV !== 'production' && <VariantControlPanel />}
       </div>
     </VariantProvider>
   )

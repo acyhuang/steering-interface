@@ -1,22 +1,22 @@
-import { Button } from "./ui/button"
-import { Card } from "./ui/card"
-import { FeatureActivation, SteerFeatureResponse } from "@/types/features"
-import { featuresApi } from "@/lib/api"
-import { useState } from "react"
+import { Button } from "../ui/button"
+import { Card } from "../ui/card"
 import { Plus, Minus } from "lucide-react"
+import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { featuresApi } from "@/lib/api"
+import { createLogger } from "@/lib/logger"
+import { FeatureCardProps } from "./variants"
 
-interface FeatureCardProps {
-  feature: FeatureActivation;
-  onSteer?: (response: SteerFeatureResponse) => void;
-  onFeatureModified?: () => void;
-  modification?: number;
-  readOnly?: boolean;
-}
+const logger = createLogger('DiscreteFeatureCard')
 
-export function FeatureCard({ feature, onSteer, onFeatureModified, modification, readOnly }: FeatureCardProps) {
+export function DiscreteFeatureCard({ 
+  feature, 
+  onSteer, 
+  onFeatureModified, 
+  modification,
+  readOnly 
+}: FeatureCardProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const [localModification, setModification] = useState<number | null>(modification || null);
 
   const handleSteer = async (value: number) => {
@@ -25,7 +25,7 @@ export function FeatureCard({ feature, onSteer, onFeatureModified, modification,
     setIsLoading(true);
     try {
       const response = await featuresApi.steerFeature({
-        session_id: "default_session", // TODO: Get from context
+        session_id: "default_session",
         feature_label: feature.label,
         value: value
       });
@@ -34,19 +34,14 @@ export function FeatureCard({ feature, onSteer, onFeatureModified, modification,
       onSteer?.(response);
       onFeatureModified?.();
     } catch (error) {
-      console.error('Failed to steer feature:', error);
-      // TODO: Add error handling UI
+      logger.error('Failed to steer feature:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Card 
-      className="p-4 relative"
-      onMouseEnter={() => !readOnly && setIsHovered(true)}
-      onMouseLeave={() => !readOnly && !localModification && setIsHovered(false)}
-    >
+    <Card className="p-4 relative">
       <div className="flex justify-between items-center">
         <div className="flex-1">
           <div className="font-medium">{feature.label}</div>
@@ -57,10 +52,7 @@ export function FeatureCard({ feature, onSteer, onFeatureModified, modification,
           )}
         </div>
         {!readOnly ? (
-          <div className={cn(
-            "flex gap-2 transition-opacity duration-200",
-            (!isHovered && !localModification) && "opacity-0"
-          )}>
+          <div className="flex gap-2">
             <Button
               variant="outline"
               size="icon"

@@ -1,23 +1,17 @@
-import { Card } from "./ui/card"
-import { Slider } from "./ui/slider"
-import { FeatureActivation, SteerFeatureResponse } from "@/types/features"
-import { featuresApi } from "@/lib/api"
+import { Card } from "../ui/card"
+import { Slider } from "../ui/slider"
 import { useState } from "react"
 import { createLogger } from "@/lib/logger"
+import { featuresApi } from "@/lib/api"
+import { FeatureCardProps } from "./variants"
 
 const logger = createLogger('ContinuousFeatureCard')
-
-interface ContinuousFeatureCardProps {
-  feature: FeatureActivation;
-  onSteer?: (response: SteerFeatureResponse) => void;
-  onFeatureModified?: () => void;
-}
 
 export function ContinuousFeatureCard({ 
   feature, 
   onSteer, 
   onFeatureModified 
-}: ContinuousFeatureCardProps) {
+}: FeatureCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [sliderValue, setSliderValue] = useState([0]); // Start at neutral position
 
