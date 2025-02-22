@@ -1,11 +1,12 @@
 import { Button } from "../ui/button"
 import { Card } from "../ui/card"
 import { Plus, Minus } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { featuresApi } from "@/lib/api"
 import { createLogger } from "@/lib/logger"
 import { FeatureCardProps } from "./variants"
+import { useFeatureModifications } from "@/contexts/FeatureContext"
 
 const logger = createLogger('DiscreteFeatureCard')
 
@@ -13,11 +14,11 @@ export function DiscreteFeatureCard({
   feature, 
   onSteer, 
   onFeatureModified, 
-  modification,
   readOnly 
 }: FeatureCardProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [localModification, setModification] = useState<number | null>(modification || null);
+  const { getModification, setModification } = useFeatureModifications();
+  const modification = getModification(feature.label);
 
   const handleSteer = async (value: number) => {
     if (isLoading) return;
@@ -30,7 +31,9 @@ export function DiscreteFeatureCard({
         value: value
       });
 
-      setModification(value);
+      // Update global modification state
+      setModification(feature.label, value);
+
       onSteer?.(response);
       onFeatureModified?.();
     } catch (error) {
@@ -46,9 +49,16 @@ export function DiscreteFeatureCard({
         <div className="flex-1">
           <div className="font-medium">{feature.label}</div>
           {!readOnly && (
-            <div className="text-sm text-muted-foreground">
-              Activation: {feature.activation.toFixed(2)}
-            </div>
+            <>
+              <div className="text-sm text-muted-foreground">
+                Base Activation: {feature.activation.toFixed(2)}
+              </div>
+              {modification !== undefined && (
+                <div className="text-sm text-blue-600">
+                  Modified: {modification.toFixed(2)}
+                </div>
+              )}
+            </>
           )}
         </div>
         {!readOnly ? (
@@ -60,12 +70,12 @@ export function DiscreteFeatureCard({
               disabled={isLoading}
               className={cn(
                 "transition-colors",
-                localModification === -0.4 && "bg-red-100 hover:bg-red-200 border-red-200"
+                modification === -0.4 && "bg-red-100 hover:bg-red-200 border-red-200"
               )}
             >
               <Minus className={cn(
                 "h-4 w-4",
-                localModification === -0.4 && "text-red-600"
+                modification === -0.4 && "text-red-600"
               )} />
             </Button>
             <Button
@@ -75,19 +85,19 @@ export function DiscreteFeatureCard({
               disabled={isLoading}
               className={cn(
                 "transition-colors",
-                localModification === 0.4 && "bg-green-100 hover:bg-green-200 border-green-200"
+                modification === 0.4 && "bg-green-100 hover:bg-green-200 border-green-200"
               )}
             >
               <Plus className={cn(
                 "h-4 w-4",
-                localModification === 0.4 && "text-green-600"
+                modification === 0.4 && "text-green-600"
               )} />
             </Button>
           </div>
         ) : (
           <div className="flex gap-2">
-            {localModification && (
-              localModification > 0 ? (
+            {modification && (
+              modification > 0 ? (
                 <Plus className="h-4 w-4 text-green-600" />
               ) : (
                 <Minus className="h-4 w-4 text-red-600" />

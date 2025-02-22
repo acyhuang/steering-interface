@@ -5,9 +5,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
 import { useState, useEffect } from "react"
 import { Search } from "lucide-react"
 import { Button } from "./ui/button"
-import { FeatureActivation, SteerFeatureResponse, ModifiedFeature } from "@/types/features"
+import { FeatureActivation, SteerFeatureResponse } from "@/types/features"
 import { featuresApi } from "@/lib/api"
-import { useFeatureCardVariant, DiscreteFeatureCard } from './feature-card'
+import { useFeatureCardVariant, ContinuousFeatureCard } from './feature-card'
+import { useFeatureModifications } from "@/contexts/FeatureContext"
 
 interface InspectorProps {
   features?: FeatureActivation[];
@@ -17,27 +18,13 @@ interface InspectorProps {
 export function Inspector({ features, isLoading }: InspectorProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [localFeatures, setLocalFeatures] = useState(features || [])
-  const [modifiedFeatures, setModifiedFeatures] = useState<ModifiedFeature[]>([])
+  const { modifications } = useFeatureModifications()
   
   const FeatureCardVariant = useFeatureCardVariant();
 
   useEffect(() => {
     setLocalFeatures(features || [])
   }, [features])
-
-  const fetchModifiedFeatures = async () => {
-    try {
-      const response = await featuresApi.getModifiedFeatures("default_session");
-      setModifiedFeatures(response);
-    } catch (error) {
-      console.error('Failed to fetch modified features:', error);
-    }
-  };
-
-  useEffect(() => {
-    // Fetch modified features when component mounts
-    fetchModifiedFeatures();
-  }, []);
 
   const handleSteer = async (response: SteerFeatureResponse) => {
     setLocalFeatures(current => 
@@ -54,15 +41,18 @@ export function Inspector({ features, isLoading }: InspectorProps) {
       // @ts-ignore
       await window.regenerateLastMessage();
     }
-
-    // Fetch updated modified features after steering
-    await fetchModifiedFeatures();
   }
 
   const handleSearch = () => {
     // TODO: Implement search functionality
     console.log("Searching for:", searchQuery)
   }
+
+  // Convert modifications Map to array for Modified tab
+  const modifiedFeatures = Array.from(modifications.entries()).map(([label, value]) => ({
+    label,
+    value
+  }));
 
   return (
     <Card className="h-full p-4">
@@ -94,7 +84,7 @@ export function Inspector({ features, isLoading }: InspectorProps) {
           </TabsList>
 
           <div className="flex-1 min-h-0 mt-4">
-            <ScrollArea className="h-[calc(100vh-240px)]">
+            <ScrollArea className="h-[calc(100vh-280px)]">
               <TabsContent value="activated" className="m-0">
                 {isLoading ? (
                   <div className="text-sm text-gray-500">Loading features...</div>
@@ -105,7 +95,6 @@ export function Inspector({ features, isLoading }: InspectorProps) {
                         key={index} 
                         feature={feature}
                         onSteer={handleSteer}
-                        onFeatureModified={fetchModifiedFeatures}
                       />
                     ))}
                   </div>
@@ -126,13 +115,12 @@ export function Inspector({ features, isLoading }: InspectorProps) {
                 {modifiedFeatures.length > 0 ? (
                   <div className="space-y-2 pr-4">
                     {modifiedFeatures.map((feature, index) => (
-                      <DiscreteFeatureCard 
+                      <ContinuousFeatureCard 
                         key={index}
                         feature={{
                           label: feature.label,
-                          activation: 0
+                          activation: feature.value  // Use the actual modification value
                         }}
-                        modification={feature.value}
                         readOnly
                       />
                     ))}

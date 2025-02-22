@@ -9,6 +9,7 @@ import { featuresApi } from "@/lib/api"
 import { createLogger } from "@/lib/logger"
 import { VariantProvider } from "@/lib/variants/VariantProvider"
 import { VariantControlPanel } from "@/lib/variants/VariantControlPanel"
+import { FeatureProvider } from "@/contexts/FeatureContext"
 
 const logger = createLogger('App')
 
@@ -48,32 +49,34 @@ function App() {
   }
 
   return (
-    <VariantProvider>
-      <div className="h-screen flex flex-col">
-        <div className="p-4 flex justify-between items-center">
-          <VariantControlPanel />
-          <ConnectionStatus />
+    <FeatureProvider>
+      <VariantProvider>
+        <div className="h-screen flex flex-col">
+          <div className="p-4 flex justify-between items-center">
+            <VariantControlPanel />
+            <ConnectionStatus />
+          </div>
+          <Split 
+            className="flex-1 flex gap-4 p-4 overflow-hidden split"
+            sizes={sizes}
+            minSize={[400, 400]} 
+            onDragEnd={setSizes}
+            gutterStyle={() => ({
+              backgroundColor: '#e5e7eb', // light gray
+              width: '4px',
+              cursor: 'col-resize'
+            })}
+          >
+            <div className="h-full">
+              <Chat onMessagesUpdate={handleMessagesUpdate} />
+            </div>
+            <div className="h-full">
+              <Inspector features={features} isLoading={isLoadingFeatures} />
+            </div>
+          </Split>
         </div>
-        <Split 
-          className="flex-1 flex gap-4 p-4 overflow-hidden split"
-          sizes={sizes}
-          minSize={[400, 400]} 
-          onDragEnd={setSizes}
-          gutterStyle={() => ({
-            backgroundColor: '#e5e7eb', // light gray
-            width: '4px',
-            cursor: 'col-resize'
-          })}
-        >
-          <div className="h-full">
-            <Chat onMessagesUpdate={handleMessagesUpdate} />
-          </div>
-          <div className="h-full">
-            <Inspector features={features} isLoading={isLoadingFeatures} />
-          </div>
-        </Split>
-      </div>
-    </VariantProvider>
+      </VariantProvider>
+    </FeatureProvider>
   )
 }
 
