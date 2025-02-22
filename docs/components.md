@@ -35,10 +35,13 @@
 - Handles retry logic and error cases
 
 ### Feature Management Service
-- Controls feature inspection and steering
-- Manages feature activation calculations
-- Handles feature modification requests
+- Provides a secure wrapper around the Ember SDK
+- Controls feature inspection and steering through SDK methods
+- Manages feature activation calculations via SDK
+- Handles feature modification requests with proper error handling
 - Coordinates with model variant system
+- Implements rate limiting and usage monitoring
+- Maintains SDK version compatibility
 
 ### TestBench Service
 - Manages UI/UX test configurations

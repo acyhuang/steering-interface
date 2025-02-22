@@ -27,50 +27,18 @@ sequenceDiagram
     participant CI as Chat.tsx
     participant IP as Inspector.tsx
     participant FS as /features/steer 
+    participant ES as EmberService
     participant FM as /features/modified 
     participant CC as /chat/completions
     
     U->>IP: Adjust Feature
     IP->>FS: POST Request
+    FS->>ES: Handle Request
+    ES-->>FS: Success Response
     FS->>FM: GET Request
-    FM-->>FS: Current Modifications
+    FM->>ES: Get Variant State
+    ES-->>FM: Current Modifications
+    FM-->>FS: Current State
     FS->>CC: Trigger Regeneration
     CC-->>CI: New Completion
 ```
-
-## Technical Architecture
-
-```mermaid
-graph TB
-    subgraph Frontend
-        CI[Chat Interface]
-        IP[Inspector Panel]
-        TB[TestBench Panel]
-        CS[Connection Status]
-    end
-
-    subgraph Backend
-        CCS[Chat Completion Service]
-        FMS[Feature Management Service]
-        TS[TestBench Service]
-        KV[KV Storage]
-    end
-
-    CI --> CCS
-    CI --> FMS
-    IP --> FMS
-    TB --> TS
-    TS --> KV
-    FMS --> CCS
-```
-
-## Deployment Architecture
-- Frontend: Vite + React application
-- Backend: Vercel Serverless Functions
-- Storage: Vercel KV
-- Edge-compatible architecture
-
-## Session Management
-- Single active session support
-- Session-based message history
-- Simple session token system

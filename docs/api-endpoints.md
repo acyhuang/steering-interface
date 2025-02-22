@@ -1,11 +1,13 @@
 # API Documentation
 
 ## Overview
-The Steering Interface API provides endpoints for chat completion and feature steering capabilities. The API enables:
+The Steering Interface API provides a secure wrapper around the Goodfire Ember SDK, enabling:
 - Real-time chat interactions with LLMs
 - Feature activation inspection
 - Dynamic feature steering
 - Variant state management
+- Rate limiting and usage monitoring
+- Secure SDK key management
 
 ## Base URL
 ```
@@ -139,11 +141,14 @@ All endpoints use standard HTTP status codes:
 - `200`: Success
 - `400`: Bad Request (invalid parameters)
 - `500`: Internal Server Error
+- `502`: SDK Service Error
+- `429`: Rate Limit Exceeded
 
 Error responses include a detail message:
 ```json
 {
-  "detail": "Error description"
+  "detail": "Error description",
+  "sdk_error": "Original SDK error message" // When applicable
 }
 ```
 
