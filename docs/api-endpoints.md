@@ -1,24 +1,41 @@
 # API Documentation
 
+## Implementation Status
+
+This document outlines both currently implemented endpoints and planned future enhancements. Features marked with 🚧 TODO are planned for future implementation.
+
 ## Overview
 The Steering Interface API provides a secure wrapper around the Goodfire Ember SDK, enabling:
-- Real-time chat interactions with LLMs
-- Feature activation inspection
-- Dynamic feature steering
-- Variant state management
-- Rate limiting and usage monitoring
-- Secure SDK key management
+- ✓ Real-time chat interactions with LLMs
+- ✓ Feature activation inspection
+- ✓ Dynamic feature steering
+- ✓ Basic variant state management (in-memory)
+- 🚧 TODO: Rate limiting and usage monitoring
+- ✓ Secure SDK key management
 
 ## Base URL
 ```
 Development: http://localhost:8000/api/v1
 ```
 
+## Current Session Management
+The API currently uses a simplified session model:
+- Single default session ID ("default_session")
+- In-memory variant storage
+- Session data cleared on server restart
+- No authentication required in MVP
+
+🚧 TODO: Future session enhancements planned:
+- Persistent sessions
+- Multiple concurrent sessions
+- Session authentication
+- Session state recovery
+
 ## Endpoints
 
 ### Chat
 
-#### Create Chat Completion
+#### Create Chat Completion ✓
 ```http
 POST /chat/completions
 ```
@@ -49,7 +66,12 @@ Creates a chat completion using the current model and variant settings.
 }
 ```
 
-#### Health Check
+🚧 TODO: Streaming Support
+- Implement streaming responses
+- Add SSE endpoint for real-time updates
+- Add connection recovery mechanisms
+
+#### Health Check ✓
 ```http
 GET /chat/health
 ```
@@ -65,7 +87,7 @@ Returns API health status.
 
 ### Features
 
-#### Inspect Features
+#### Inspect Features ✓
 ```http
 POST /features/inspect
 ```
@@ -96,7 +118,7 @@ Analyzes feature activations in the current conversation.
 ]
 ```
 
-#### Steer Feature
+#### Steer Feature ✓
 ```http
 POST /features/steer
 ```
@@ -122,7 +144,7 @@ Modifies a feature's activation value for the current variant.
 }
 ```
 
-#### Get Modified Features
+#### Get Modified Features ✓
 ```http
 GET /features/modified
 ```
@@ -135,29 +157,53 @@ Retrieves the complete variant state including all modifications.
 
 **Response:** Raw variant JSON containing all modifications and settings
 
+### Future Endpoints 🚧 TODO
+
+#### Configuration Management
+```http
+POST /config/save
+GET /config/load
+DELETE /config/delete
+```
+
+#### Test Management
+```http
+POST /test/create
+GET /test/status
+PUT /test/update
+DELETE /test/delete
+```
+
 ## Error Handling
 
-All endpoints use standard HTTP status codes:
-- `200`: Success
-- `400`: Bad Request (invalid parameters)
-- `500`: Internal Server Error
-- `502`: SDK Service Error
-- `429`: Rate Limit Exceeded
+Current implementation:
+- ✓ Standard HTTP status codes
+- ✓ Basic error messages
+- ✓ Simple error response format
 
-Error responses include a detail message:
+🚧 TODO: Enhanced error handling:
+- Detailed error codes
+- SDK-specific error handling
+- Retry mechanisms
+- Rate limit headers
+- Error tracking and monitoring
+
+Current error responses include a detail message:
 ```json
 {
-  "detail": "Error description",
-  "sdk_error": "Original SDK error message" // When applicable
+  "detail": "Error description"
 }
 ```
 
-## Session Management
-
-The API currently uses a simplified session model:
-- Default session ID: `"default_session"`
-- One active session supported at a time
-- No authentication required in v0
+🚧 TODO: Enhanced error response format:
+```json
+{
+  "detail": "Error description",
+  "code": "ERROR_CODE",
+  "sdk_error": "Original SDK error message",
+  "retry_after": "timestamp"
+}
+```
 
 ## Variants
 
