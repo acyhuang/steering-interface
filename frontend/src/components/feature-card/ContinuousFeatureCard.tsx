@@ -17,7 +17,7 @@ export function ContinuousFeatureCard({
   testId  // Keep testId for TestBench but don't use it for model operations
 }: FeatureCardProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const { getModification, setModification } = useFeatureModifications();
+  const { getModification, setModification, clearModification } = useFeatureModifications();
   
   // Initialize slider with existing modification or 0 (neutral position)
   const [sliderValue, setSliderValue] = useState<number[]>(() => {
@@ -45,26 +45,45 @@ export function ContinuousFeatureCard({
     setIsLoading(true);
     try {
       const steeringValue = newValue[0];
-      logger.debug('Steering feature', { 
+      logger.debug('Committing feature value', { 
         feature: feature.label, 
         value: steeringValue,
         variantId
       });
 
-      const response = await featuresApi.steerFeature({
-        session_id: variantId,
-        variant_id: variantId,
-        feature_label: feature.label,
-        value: steeringValue
-      });
+      // If the slider is at 0, clear the feature
+      if (steeringValue === 0) {
+        const response = await featuresApi.clearFeature({
+          session_id: variantId,
+          variant_id: variantId,
+          feature_label: feature.label
+        });
 
-      // Update global modification state
-      setModification(feature.label, steeringValue);
+        // Clear the modification in global state
+        clearModification(feature.label);
+        
+        onSteer?.({ 
+          label: response.label,
+          activation: 0,
+          modified_value: 0
+        });
+      } else {
+        // Otherwise apply the new value
+        const response = await featuresApi.steerFeature({
+          session_id: variantId,
+          variant_id: variantId,
+          feature_label: feature.label,
+          value: steeringValue
+        });
 
-      onSteer?.(response);
+        // Update global modification state
+        setModification(feature.label, steeringValue);
+        onSteer?.(response);
+      }
+
       onFeatureModified?.();
     } catch (error) {
-      logger.error('Failed to steer feature:', error);
+      logger.error('Failed to modify feature:', error);
     } finally {
       setIsLoading(false);
     }

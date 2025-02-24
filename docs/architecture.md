@@ -31,14 +31,21 @@ sequenceDiagram
     participant CI as Chat.tsx
     participant IP as Inspector.tsx
     participant FS as /features/steer 
+    participant FC as /features/clear
     participant FM as /features/modified 
     participant CC as /chat/completions
     
-    U->>IP: Adjust Feature
-    IP->>FS: POST Request
-    FS->>FM: GET Request
-    FM-->>FS: Current State
-    FS->>CC: Trigger Regeneration
+    U->>IP: Adjust/Clear Feature
+    alt Adjust Feature
+        IP->>FS: POST Request
+        FS->>FM: GET Request
+        FM-->>FS: Current State
+    else Clear Feature
+        IP->>FC: POST Request
+        FC->>FM: GET Request
+        FM-->>FC: Current State
+    end
+    IP->>CC: Trigger Regeneration
     CC-->>CI: New Completion
 ```
 

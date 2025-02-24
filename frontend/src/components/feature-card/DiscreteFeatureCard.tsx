@@ -19,7 +19,7 @@ export function DiscreteFeatureCard({
   testId  // Keep testId for TestBench but don't use it for model operations
 }: FeatureCardProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const { getModification, setModification } = useFeatureModifications();
+  const { getModification, setModification, clearModification } = useFeatureModifications();
   const modification = getModification(feature.label);
 
   const handleSteer = async (value: number) => {
@@ -30,23 +30,43 @@ export function DiscreteFeatureCard({
       logger.debug('Steering feature', { 
         feature: feature.label, 
         value,
-        variantId
+        variantId,
+        currentModification: modification
       });
 
-      const response = await featuresApi.steerFeature({
-        session_id: variantId,
-        variant_id: variantId,
-        feature_label: feature.label,
-        value: value
-      });
+      // If clicking the same button that's already active, clear the feature
+      if (modification === value) {
+        const response = await featuresApi.clearFeature({
+          session_id: variantId,
+          variant_id: variantId,
+          feature_label: feature.label
+        });
 
-      // Update global modification state
-      setModification(feature.label, value);
+        // Clear the modification in global state
+        clearModification(feature.label);
+        
+        onSteer?.({ 
+          label: response.label,
+          activation: 0,
+          modified_value: 0
+        });
+      } else {
+        // Otherwise apply the new value
+        const response = await featuresApi.steerFeature({
+          session_id: variantId,
+          variant_id: variantId,
+          feature_label: feature.label,
+          value: value
+        });
 
-      onSteer?.(response);
+        // Update global modification state
+        setModification(feature.label, value);
+        onSteer?.(response);
+      }
+
       onFeatureModified?.();
     } catch (error) {
-      logger.error('Failed to steer feature:', error);
+      logger.error('Failed to modify feature:', error);
     } finally {
       setIsLoading(false);
     }

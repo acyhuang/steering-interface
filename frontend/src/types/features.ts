@@ -11,7 +11,7 @@ export interface FeatureActivation {
 }
 
 export interface InspectFeaturesRequest {
-  messages: ChatMessage[];
+  messages: { role: string; content: string }[];
   session_id: string;
   variant_id?: string;
 }
@@ -27,4 +27,14 @@ export interface SteerFeatureResponse {
   label: string;
   activation: number;
   modified_value: number;
+}
+
+export interface ClearFeatureRequest {
+  session_id: string;
+  variant_id?: string;
+  feature_label: string;
+}
+
+export interface ClearFeatureResponse {
+  label: string;
 } 

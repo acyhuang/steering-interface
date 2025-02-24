@@ -157,6 +157,29 @@ Retrieves the complete variant state including all modifications.
 
 **Response:** Raw variant JSON containing all modifications and settings
 
+#### Clear Feature ✓
+```http
+POST /features/clear
+```
+
+Removes a feature's modifications from the current variant.
+
+**Request Body:**
+```json
+{
+  "session_id": "string",
+  "variant_id": "string",      // optional
+  "feature_label": "string"
+}
+```
+
+**Response:**
+```json
+{
+  "label": "string"          // Cleared feature label
+}
+```
+
 ### Future Endpoints 🚧 TODO
 
 #### Configuration Management
@@ -211,3 +234,30 @@ Variants represent different configurations of the model:
 - Each session can have multiple variants
 - Default variant ID: `"default"`
 - Variants persist feature modifications within a session
+
+### Current API Trigger Flows ✓
+
+### Message Flow
+
+### Steering Flow
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CI as Chat.tsx
+    participant IP as Inspector.tsx
+    participant FS as /features/steer 
+    participant FC as /features/clear
+    participant FM as /features/modified 
+    participant CC as /chat/completions
+    
+    U->>IP: Adjust/Clear Feature
+    alt Adjust Feature
+        IP->>FS: POST Request
+    else Clear Feature
+        IP->>FC: POST Request
+    end
+    FC->>FM: GET Request
+    FM-->>FC: Current State
+    FC->>CC: Trigger Regeneration
+    CC-->>CI: New Completion
+```

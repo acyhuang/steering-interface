@@ -32,4 +32,18 @@ class SteerFeatureResponse(BaseModel):
 
 class ModifiedFeature(BaseModel):
     label: str
-    value: float 
+    value: float
+
+class ClearFeatureRequest(BaseModel):
+    """Model for feature clearing requests."""
+    session_id: str
+    variant_id: Optional[str] = None
+    feature_label: str
+
+class ClearFeatureResponse(BaseModel):
+    """Response model for feature clearing.
+    
+    Attributes:
+        label: Feature label that was cleared
+    """
+    label: str 

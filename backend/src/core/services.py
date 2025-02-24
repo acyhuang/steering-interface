@@ -1,7 +1,7 @@
 from typing import AsyncGenerator, List, Optional, Dict
 from goodfire import AsyncClient, Variant
 from ..models.chat import ChatMessage, ChatRequest, ChatResponse
-from ..models.features import FeatureActivation, SteerFeatureResponse
+from ..models.features import FeatureActivation, SteerFeatureResponse, ClearFeatureResponse
 import logging
 from .config import Settings
 import json  # Add this import at the top
@@ -194,4 +194,41 @@ class EmberService:
             
         except Exception as e:
             logger.error(f"Error getting variant JSON: {str(e)}")
+            raise
+
+    async def clear_feature(
+        self,
+        session_id: str,
+        variant_id: Optional[str],
+        feature_label: str
+    ) -> ClearFeatureResponse:
+        """Clear a feature's modifications from the variant."""
+        try:
+            logger.info(f"[VARIANT_DEBUG] Clearing feature for session={session_id}, variant={variant_id}")
+            variant = self.get_variant(session_id, variant_id)
+            logger.info(f"[VARIANT_DEBUG] Pre-clearing variant state: {json.dumps(variant.json(), indent=2)}")
+            
+            # Search for the feature
+            features = await self.client.features.search(
+                feature_label,
+                model=variant,
+                top_k=1
+            )
+            
+            if not features:
+                raise ValueError(f"Feature '{feature_label}' not found")
+                
+            feature = features[0]
+            
+            # Clear the feature
+            variant.clear(feature)
+            logger.info(f"[VARIANT_DEBUG] Post-clearing variant state: {json.dumps(variant.json(), indent=2)}")
+            
+            # Return response with the cleared feature label
+            return ClearFeatureResponse(
+                label=feature_label
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in clear_feature: {str(e)}")
             raise 

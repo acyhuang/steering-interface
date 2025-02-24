@@ -1,7 +1,14 @@
 from fastapi import APIRouter, Depends
 from typing import List, Optional, Dict
 from ..models.chat import ChatMessage
-from ..models.features import FeatureActivation, SteerFeatureRequest, SteerFeatureResponse, ModifiedFeature
+from ..models.features import (
+    FeatureActivation,
+    SteerFeatureRequest,
+    SteerFeatureResponse,
+    ModifiedFeature,
+    ClearFeatureRequest,
+    ClearFeatureResponse
+)
 from ..core.services import EmberService
 from ..core.dependencies import get_ember_service
 from ..core.config import get_settings
@@ -71,4 +78,27 @@ async def get_modified_features(
 ) -> Dict:
     """Get raw variant JSON state"""
     logger.info(f"[API_DEBUG] get_modified_features called with session_id={session_id}, variant_id={variant_id}")
-    return ember_service.get_modified_features(session_id, variant_id) 
+    return ember_service.get_modified_features(session_id, variant_id)
+
+@router.post("/clear", response_model=ClearFeatureResponse)
+async def clear_feature(
+    request: ClearFeatureRequest,
+    ember_service: EmberService = Depends(get_ember_service)
+) -> ClearFeatureResponse:
+    """Clear a feature's modifications from the variant."""
+    logger.info(f"[API_DEBUG] clear_feature called with session_id={request.session_id}, variant_id={request.variant_id}")
+    logger.info(f"Received clear request for feature {request.feature_label}")
+    
+    try:
+        result = await ember_service.clear_feature(
+            session_id=request.session_id,
+            variant_id=request.variant_id,
+            feature_label=request.feature_label
+        )
+        
+        logger.info(f"Successfully cleared feature {request.feature_label}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error during feature clearing: {str(e)}")
+        raise 
