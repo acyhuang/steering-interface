@@ -7,7 +7,7 @@ import { Search } from "lucide-react"
 import { Button } from "./ui/button"
 import { FeatureActivation, SteerFeatureResponse } from "@/types/features"
 import { featuresApi } from "@/lib/api"
-import { useFeatureCardVariant, ContinuousFeatureCard } from './feature-card'
+import { useFeatureCardVariant } from './feature-card'
 
 interface InspectorProps {
   features?: FeatureActivation[];
@@ -15,10 +15,24 @@ interface InspectorProps {
   variantId?: string;
 }
 
+interface FeatureEdit {
+  feature_id: string;
+  feature_label: string;
+  index_in_sae: number;
+  value: number;
+}
+
+interface VariantResponse {
+  base_model: string;
+  edits: FeatureEdit[];
+  scopes: any[];
+}
+
 export function Inspector({ features, isLoading, variantId = "default" }: InspectorProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [localFeatures, setLocalFeatures] = useState(features || [])
-  const [variantJson, setVariantJson] = useState<any>(null)
+  const [variantJson, setVariantJson] = useState<VariantResponse | null>(null)
+  const [modifiedFeatures, setModifiedFeatures] = useState<FeatureActivation[]>([])
   const [isLoadingModified, setIsLoadingModified] = useState(false)
   const [selectedTab, setSelectedTab] = useState("activated")
   
@@ -35,8 +49,20 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
       const response = await featuresApi.getModifiedFeatures(variantId);
       console.log('[INSPECTOR_DEBUG] Received variant state:', response);
       setVariantJson(response);
+      
+      // Transform variant JSON into FeatureActivation format
+      if (response && Array.isArray(response.edits)) {
+        const features: FeatureActivation[] = response.edits.map((edit: FeatureEdit) => ({
+          label: edit.feature_label,
+          activation: typeof edit.value === 'number' ? edit.value : 0
+        }));
+        setModifiedFeatures(features);
+      } else {
+        setModifiedFeatures([]);
+      }
     } catch (error) {
       console.error('[INSPECTOR_DEBUG] Failed to fetch variant state:', error);
+      setModifiedFeatures([]);
     } finally {
       setIsLoadingModified(false)
     }
@@ -152,15 +178,20 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
               <TabsContent value="modified" className="m-0">
                 {isLoadingModified ? (
                   <div className="text-sm text-gray-500">Loading variant state...</div>
-                ) : variantJson ? (
+                ) : modifiedFeatures.length > 0 ? (
                   <div className="space-y-2 pr-4">
-                    <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto">
-                      {JSON.stringify(variantJson, null, 2)}
-                    </pre>
+                    {modifiedFeatures.map((feature, index) => (
+                      <FeatureCardVariant
+                        key={index}
+                        feature={feature}
+                        onSteer={handleSteer}
+                        variantId={variantId}
+                      />
+                    ))}
                   </div>
                 ) : (
                   <div className="text-sm text-gray-500">
-                    No variant state available.
+                    No modified features available.
                   </div>
                 )}
               </TabsContent>
@@ -169,5 +200,5 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
         </Tabs>
       </div>
     </Card>
-  )
+  );
 } 
