@@ -18,6 +18,8 @@ This document outlines both currently implemented features and planned future en
 - Provides controls for feature adjustment
 - Updates in real-time as messages are processed
 - Shows feature search and filtering options
+- Semantic feature search with overlay results display
+- Allows steering of search results
 
 ### TestBench Control Panel 🚧 TODO
 - Manages UI/UX testing configurations

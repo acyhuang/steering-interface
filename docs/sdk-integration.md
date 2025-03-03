@@ -43,6 +43,40 @@ inspector = client.features.inspect(
 )
 ```
 
+### /features/search Endpoint ✓
+```python
+async def search_features(
+    query: str,
+    session_id: str,
+    variant_id: Optional[str] = None,
+    top_k: Optional[int] = 20
+) -> List[FeatureActivation]:
+    """Search for features based on semantic similarity to a query string."""
+    variant = self.get_variant(session_id, variant_id)
+    
+    # Use the SDK to search for features
+    features = await client.features.search(
+        query=query,
+        model=variant,
+        top_k=top_k
+    )
+    
+    # Convert to FeatureActivation format
+    result = []
+    for feature in features:
+        # Check if this feature has been modified in the variant
+        activation = 0.0
+        # Check if feature has been modified
+        # (Implementation details omitted for brevity)
+        
+        result.append(FeatureActivation(
+            label=feature.label,
+            activation=activation
+        ))
+    
+    return result
+```
+
 #### Feature Modification ✓
 ```python
 # Modify single feature

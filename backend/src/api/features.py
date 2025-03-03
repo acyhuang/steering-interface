@@ -24,6 +24,12 @@ class InspectFeaturesRequest(BaseModel):
     session_id: str
     variant_id: Optional[str] = None
 
+class SearchFeaturesRequest(BaseModel):
+    query: str
+    session_id: str
+    variant_id: Optional[str] = None
+    top_k: Optional[int] = 20
+
 @router.post("/inspect", response_model=List[FeatureActivation])
 async def inspect_features(
     request: InspectFeaturesRequest,
@@ -101,4 +107,16 @@ async def clear_feature(
         
     except Exception as e:
         logger.error(f"Error during feature clearing: {str(e)}")
-        raise 
+        raise
+
+@router.post("/search", response_model=List[FeatureActivation])
+async def search_features(
+    request: SearchFeaturesRequest,
+    ember_service: EmberService = Depends(get_ember_service)
+) -> List[FeatureActivation]:
+    return await ember_service.search_features(
+        query=request.query,
+        session_id=request.session_id,
+        variant_id=request.variant_id,
+        top_k=request.top_k
+    ) 

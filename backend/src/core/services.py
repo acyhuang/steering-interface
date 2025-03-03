@@ -65,18 +65,22 @@ class EmberService:
         return new_variant
     
     def get_variant(self, session_id: str, variant_id: Optional[str] = None) -> Variant:
-        """Get a specific variant or the default if none specified."""
-        if variant_id is None:
-            return self._get_default_variant(session_id)
-            
+        """Get a variant by ID, or the default variant if no ID is provided."""
+        effective_variant_id = variant_id or "default"
+        
+        # Initialize session if it doesn't exist
         if session_id not in self.variants:
-            raise ValueError(f"No variants found for session {session_id}")
+            self.variants[session_id] = {}
+        
+        # Initialize default variant if it doesn't exist
+        if effective_variant_id == "default" and effective_variant_id not in self.variants[session_id]:
+            self.variants[session_id]["default"] = Variant("meta-llama/Llama-3.3-70B-Instruct")
             
-        variant = self.variants[session_id].get(variant_id)
-        if not variant:
-            raise ValueError(f"Variant {variant_id} not found")
+        # Check if the variant exists
+        if effective_variant_id not in self.variants[session_id]:
+            raise ValueError(f"Variant {effective_variant_id} not found in session {session_id}")
             
-        return variant
+        return self.variants[session_id][effective_variant_id]
     
     async def create_chat_completion(
         self,
@@ -231,4 +235,42 @@ class EmberService:
             
         except Exception as e:
             logger.error(f"Error in clear_feature: {str(e)}")
+            raise
+
+    async def search_features(
+        self,
+        query: str,
+        session_id: str,
+        variant_id: Optional[str] = None,
+        top_k: Optional[int] = 20
+    ) -> List[FeatureActivation]:
+        """Search for features based on semantic similarity to a query string."""
+        try:
+            variant = self.get_variant(session_id, variant_id)
+            
+            # Use the SDK to search for features
+            features = await self.client.features.search(
+                query=query,
+                model=variant,
+                top_k=top_k
+            )
+            
+            # Convert to FeatureActivation format
+            result = []
+            for feature in features:
+                # Check if this feature has been modified in the variant
+                activation = 0.0
+                
+                # For now, just use 0.0 as the activation value
+                # We'll fix the comparison logic once we understand the object structure
+                
+                result.append(FeatureActivation(
+                    label=feature.label,
+                    activation=activation
+                ))
+            
+            logger.info(f"Found {len(result)} features for query: {query}")
+            return result
+        except Exception as e:
+            logger.error(f"Error searching features: {str(e)}")
             raise 

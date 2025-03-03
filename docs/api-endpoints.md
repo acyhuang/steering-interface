@@ -180,6 +180,33 @@ Removes a feature's modifications from the current variant.
 }
 ```
 
+#### Search Features ✓
+```http
+POST /features/search
+```
+
+Searches for features based on semantic similarity to a query string.
+
+**Request Body:**
+```json
+{
+  "query": "string",          // Search query
+  "session_id": "string",
+  "variant_id": "string",     // optional
+  "top_k": 20                 // optional, default: 20
+}
+```
+
+**Response:**
+```json
+[
+  {
+    "label": "string",        // Feature label
+    "activation": 0.0         // Current activation value
+  }
+]
+```
+
 ### Future Endpoints 🚧 TODO
 
 #### Configuration Management

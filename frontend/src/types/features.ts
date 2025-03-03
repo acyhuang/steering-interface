@@ -37,4 +37,11 @@ export interface ClearFeatureRequest {
 
 export interface ClearFeatureResponse {
   label: string;
+}
+
+export interface SearchFeaturesRequest {
+  query: string;
+  session_id: string;
+  variant_id?: string;
+  top_k?: number;
 } 

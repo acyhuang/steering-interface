@@ -35,6 +35,9 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
   const [modifiedFeatures, setModifiedFeatures] = useState<FeatureActivation[]>([])
   const [isLoadingModified, setIsLoadingModified] = useState(false)
   const [selectedTab, setSelectedTab] = useState("activated")
+  const [searchResults, setSearchResults] = useState<FeatureActivation[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
   
   const FeatureCardVariant = useFeatureCardVariant();
 
@@ -107,9 +110,33 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
     }
   }
 
-  const handleSearch = () => {
-    // TODO: Implement search functionality
-    console.log("Searching for:", searchQuery)
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    
+    setIsSearching(true);
+    setShowSearchResults(true);
+    
+    try {
+      console.log("Searching for features with query:", searchQuery);
+      const results = await featuresApi.searchFeatures({
+        query: searchQuery,
+        session_id: variantId,
+        variant_id: variantId,
+        top_k: 10
+      });
+      
+      console.log("Search results:", results);
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Error searching features:", error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
+  const closeSearchResults = () => {
+    setShowSearchResults(false);
   }
 
   return (
@@ -133,6 +160,46 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
             </Button>
           </div>
         </div>
+
+        {showSearchResults && (
+          <div className="relative">
+            <Card className="absolute z-10 w-full shadow-lg flex flex-col" 
+                  style={{ 
+                    maxHeight: 'calc(100vh - 200px)', 
+                    height: 'min(600px, 70vh)' 
+                  }}>
+              <div className="flex justify-between items-center p-4 border-b">
+                <h3 className="font-medium">Search Results</h3>
+                <Button variant="ghost" size="sm" onClick={closeSearchResults}>
+                  ✕
+                </Button>
+              </div>
+              
+              <div className="flex-1 overflow-hidden">
+                {isSearching ? (
+                  <div className="text-sm text-gray-500 p-4">Searching...</div>
+                ) : searchResults.length > 0 ? (
+                  <ScrollArea className="h-full">
+                    <div className="space-y-2 p-4">
+                      {searchResults.map((feature, index) => (
+                        <FeatureCardVariant
+                          key={index}
+                          feature={feature}
+                          onSteer={handleSteer}
+                          variantId={variantId}
+                        />
+                      ))}
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <div className="text-sm text-gray-500 p-4">
+                    No features found for "{searchQuery}"
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+        )}
 
         <Tabs 
           defaultValue="activated" 

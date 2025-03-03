@@ -49,6 +49,22 @@ sequenceDiagram
     CC-->>CI: New Completion
 ```
 
+### Feature Search Flow
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant IP as Inspector.tsx
+    participant FS as /features/search
+    
+    U->>IP: Enter Search Query
+    U->>IP: Click Search Button
+    IP->>FS: POST Request
+    FS-->>IP: Return Matching Features
+    IP-->>U: Display Search Results Overlay
+    U->>IP: Adjust Feature from Results
+    IP->>FS: Steer Feature (if adjusted)
+```
+
 ## Future API Trigger Flows 🚧 TODO
 
 ### Streaming Message Flow
