@@ -5,9 +5,21 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
 import { useState, useEffect, useCallback } from "react"
 import { Search } from "lucide-react"
 import { Button } from "./ui/button"
-import { FeatureActivation, SteerFeatureResponse } from "@/types/features"
+import { 
+  FeatureActivation, 
+  SteerFeatureResponse, 
+  FeatureCluster,
+  ClusteredFeaturesResponse 
+} from "@/types/features"
 import { featuresApi } from "@/lib/api"
 import { useFeatureCardVariant } from './feature-card'
+import { 
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from "@/components/ui/accordion"
+import { Badge } from "@/components/ui/badge"
 
 interface InspectorProps {
   features?: FeatureActivation[];
@@ -38,12 +50,53 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
   const [searchResults, setSearchResults] = useState<FeatureActivation[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [showSearchResults, setShowSearchResults] = useState(false)
+  const [clusters, setClusters] = useState<FeatureCluster[]>([])
+  const [isClusteringLoading, setIsClusteringLoading] = useState(false)
   
   const FeatureCardVariant = useFeatureCardVariant();
 
+  const fetchClusters = useCallback(async () => {
+    if (!localFeatures || localFeatures.length === 0) return;
+    
+    setIsClusteringLoading(true);
+    try {
+      console.log('[INSPECTOR_DEBUG] Fetching clusters for features:', localFeatures.length);
+      const response = await featuresApi.clusterFeatures(
+        localFeatures,
+        variantId,
+        variantId,
+        false
+      );
+      
+      console.log('[INSPECTOR_DEBUG] Raw API response:', response);
+      
+      // Extract the clusters array from the response
+      const clusteredFeatures = response?.clusters || [];
+      
+      console.log('[INSPECTOR_DEBUG] Extracted clusters:', {
+        isArray: Array.isArray(clusteredFeatures),
+        length: clusteredFeatures?.length,
+        firstCluster: clusteredFeatures?.[0],
+        hasFeatures: clusteredFeatures?.[0]?.features?.length > 0
+      });
+      
+      setClusters(clusteredFeatures);
+    } catch (error) {
+      console.error('[INSPECTOR_DEBUG] Failed to fetch clusters:', error);
+      setClusters([]);
+    } finally {
+      setIsClusteringLoading(false);
+    }
+  }, [localFeatures, variantId]);
+
   useEffect(() => {
     setLocalFeatures(features || [])
-  }, [features])
+    
+    // Fetch clusters whenever features change
+    if (features && features.length > 0) {
+      fetchClusters();
+    }
+  }, [features, fetchClusters])
 
   const fetchVariantJson = useCallback(async () => {
     setIsLoadingModified(true)
@@ -139,6 +192,95 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
     setShowSearchResults(false);
   }
 
+  const renderActivatedFeatures = () => {
+    console.log('[INSPECTOR_DEBUG] Rendering activated features:', {
+      isLoading,
+      isClusteringLoading,
+      hasClusters: clusters && clusters.length > 0,
+      clustersLength: clusters?.length,
+      localFeaturesLength: localFeatures?.length
+    });
+
+    if (isLoading || isClusteringLoading) {
+      return <div className="text-sm text-gray-500">Loading features...</div>;
+    }
+
+    if (!localFeatures || localFeatures.length === 0) {
+      return (
+        <div className="text-sm text-gray-500">
+          No activated features. Start a conversation to see features in use.
+        </div>
+      );
+    }
+
+    if (clusters && clusters.length > 0) {
+      console.log('[INSPECTOR_DEBUG] Rendering clusters view with:', {
+        numClusters: clusters.length,
+        clusterNames: clusters.map(c => c.name),
+        totalFeatures: clusters.reduce((acc, c) => acc + c.features.length, 0)
+      });
+      return (
+        <div className="space-y-2">
+          <Accordion 
+            type="multiple" 
+            className="space-y-2"
+          >
+            {clusters.map((cluster) => (
+              <AccordionItem 
+                key={cluster.name} 
+                value={cluster.name}
+                className="border rounded-md overflow-hidden"
+              >
+                <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{cluster.name}</span>
+                      <Badge variant={cluster.type === "predefined" ? "default" : "secondary"}>
+                        {cluster.features.length}
+                      </Badge>
+                    </div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-3 pt-1">
+                  <div className="space-y-2">
+                    {cluster.features.map((feature, idx) => (
+                      <FeatureCardVariant
+                        key={`${cluster.name}-${idx}`}
+                        feature={feature}
+                        onSteer={handleSteer}
+                        variantId={variantId}
+                      />
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </div>
+      );
+    }
+
+    console.log('[INSPECTOR_DEBUG] Falling back to unclustered view:', {
+      reason: 'Clusters condition failed',
+      clusters,
+      clustersLength: clusters?.length
+    });
+    
+    // Fallback to unclustered view if clustering failed
+    return (
+      <div className="space-y-2 pr-4">
+        {localFeatures.map((feature, index) => (
+          <FeatureCardVariant
+            key={index} 
+            feature={feature}
+            onSteer={handleSteer}
+            variantId={variantId}
+          />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <Card className="h-full p-4">
       <div className="flex flex-col h-full gap-4">
@@ -216,24 +358,7 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
           <div className="flex-1 min-h-0 mt-4">
             <ScrollArea className="h-[calc(100vh-280px)]">
               <TabsContent value="activated" className="m-0">
-                {isLoading ? (
-                  <div className="text-sm text-gray-500">Loading features...</div>
-                ) : localFeatures && localFeatures.length > 0 ? (
-                  <div className="space-y-2 pr-4">
-                    {localFeatures.map((feature, index) => (
-                      <FeatureCardVariant
-                        key={index} 
-                        feature={feature}
-                        onSteer={handleSteer}
-                        variantId={variantId}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">
-                    No activated features. Start a conversation to see features in use.
-                  </div>
-                )}
+                {renderActivatedFeatures()}
               </TabsContent>
 
               <TabsContent value="suggested" className="m-0">

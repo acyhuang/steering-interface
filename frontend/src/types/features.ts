@@ -44,4 +44,14 @@ export interface SearchFeaturesRequest {
   session_id: string;
   variant_id?: string;
   top_k?: number;
+}
+
+export interface FeatureCluster {
+  name: string;
+  type: "predefined" | "dynamic";
+  features: FeatureActivation[];
+}
+
+export interface ClusteredFeaturesResponse {
+  clusters: FeatureCluster[];
 } 

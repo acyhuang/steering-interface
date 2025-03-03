@@ -1,10 +1,12 @@
-from typing import AsyncGenerator, List, Optional, Dict
+from typing import AsyncGenerator, List, Optional, Dict, Any
 from goodfire import AsyncClient, Variant
 from ..models.chat import ChatMessage, ChatRequest, ChatResponse
-from ..models.features import FeatureActivation, SteerFeatureResponse, ClearFeatureResponse
+from ..models.features import FeatureActivation, SteerFeatureResponse, ClearFeatureResponse, ModifiedFeature, FeatureCluster, ClusteredFeaturesResponse
 import logging
 from .config import Settings
 import json  # Add this import at the top
+from .llm_client import LLMClient
+from .clustering import cluster_features
 
 # Configure logging
 logging.basicConfig(
@@ -32,9 +34,18 @@ class EmberService:
         """
         self.client = AsyncClient(settings.get_ember_api_key)
         self.settings = settings
+        
+        # Initialize LLM client with API key from settings
+        api_key = settings.get_openai_api_key
+        logger.info(f"Initializing LLM client with API key: {'Set' if api_key else 'Not set'}")
+        self.llm_client = LLMClient(
+            api_key=api_key,
+            model=settings.openai_model
+        )
+        
         # Store variants by session_id -> variant_id -> variant
         self.variants: Dict[str, Dict[str, Variant]] = {}
-        logger.info("EmberService initialized")
+        logger.info(f"Initialized EmberService with default model: {settings.default_model}")
     
     def _get_default_variant(self, session_id: str) -> Variant:
         """Get or create the default variant for a session."""
@@ -65,22 +76,38 @@ class EmberService:
         return new_variant
     
     def get_variant(self, session_id: str, variant_id: Optional[str] = None) -> Variant:
-        """Get a variant by ID, or the default variant if no ID is provided."""
-        effective_variant_id = variant_id or "default"
+        """Get a variant by session_id and variant_id.
         
-        # Initialize session if it doesn't exist
-        if session_id not in self.variants:
-            self.variants[session_id] = {}
+        Args:
+            session_id: Session ID
+            variant_id: Optional variant ID (defaults to "default")
+            
+        Returns:
+            Variant object
+        """
+        variant_id = variant_id or "default"
+        logger.info(f"Getting variant for session {session_id}, variant {variant_id}")
         
-        # Initialize default variant if it doesn't exist
-        if effective_variant_id == "default" and effective_variant_id not in self.variants[session_id]:
-            self.variants[session_id]["default"] = Variant("meta-llama/Llama-3.3-70B-Instruct")
+        try:
+            # Check if we have this variant cached
+            if session_id in self.variants and variant_id in self.variants[session_id]:
+                logger.info(f"Using cached variant for session {session_id}, variant {variant_id}")
+                return self.variants[session_id][variant_id]
             
-        # Check if the variant exists
-        if effective_variant_id not in self.variants[session_id]:
-            raise ValueError(f"Variant {effective_variant_id} not found in session {session_id}")
+            # Create a new variant
+            logger.info(f"Creating new variant for session {session_id}, variant {variant_id}")
+            variant = self._get_default_variant(session_id)
             
-        return self.variants[session_id][effective_variant_id]
+            # Cache the variant
+            if session_id not in self.variants:
+                self.variants[session_id] = {}
+            self.variants[session_id][variant_id] = variant
+            
+            return variant
+        except Exception as e:
+            logger.error(f"Error getting variant: {str(e)}")
+            logger.error(f"Using default variant as fallback")
+            return self._get_default_variant(session_id)
     
     async def create_chat_completion(
         self,
@@ -274,3 +301,59 @@ class EmberService:
         except Exception as e:
             logger.error(f"Error searching features: {str(e)}")
             raise 
+
+    async def cluster_features(
+        self,
+        features: List[FeatureActivation],
+        session_id: str,
+        variant_id: Optional[str] = None,
+        force_refresh: bool = False,
+        num_categories: int = 5
+    ) -> List[FeatureCluster]:
+        """Cluster features into logical groups.
+        
+        Args:
+            features: List of features to cluster
+            session_id: Session ID
+            variant_id: Optional variant ID
+            force_refresh: Whether to force a refresh of cached results
+            num_categories: Target number of categories
+            
+        Returns:
+            List of feature clusters
+        """
+        try:
+            logger.info(f"EmberService.cluster_features called with {len(features)} features for session {session_id}")
+            # logger.info(f"Feature labels: {[f.label for f in features]}")
+            
+            # Get the variant
+            variant = self.get_variant(session_id, variant_id)
+            # logger.info(f"Using variant: {variant}")
+            
+            # Cluster the features
+            logger.info(f"Calling cluster_features with num_categories={num_categories}, force_refresh={force_refresh}")
+            clusters = await cluster_features(
+                llm_client=self.llm_client,
+                features=features,
+                num_categories=num_categories,
+                force_refresh=force_refresh
+            )
+            
+            # logger.info(f"Received {len(clusters)} clusters from cluster_features")
+            # for i, cluster in enumerate(clusters):
+            #     logger.info(f"Cluster {i+1}: {cluster.name} (Type: {cluster.type}) with {len(cluster.features)} features")
+            #     logger.info(f"Features in cluster {i+1}: {[f.label for f in cluster.features]}")
+            
+            return clusters
+        except Exception as e:
+            logger.error(f"Error in EmberService.cluster_features: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            # Fallback: return a single cluster with all features
+            logger.warning(f"Using fallback: returning all {len(features)} features in a single cluster")
+            return [FeatureCluster(
+                name="All Features",
+                features=features,
+                type="dynamic"
+            )] 

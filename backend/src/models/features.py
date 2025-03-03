@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Literal
 
 class FeatureActivation(BaseModel):
     """Model representing an activated feature and its strength.
@@ -46,4 +46,40 @@ class ClearFeatureResponse(BaseModel):
     Attributes:
         label: Feature label that was cleared
     """
-    label: str 
+    label: str
+
+# New models for feature clustering
+
+class FeatureCluster(BaseModel):
+    """Model representing a cluster of features.
+    
+    Attributes:
+        name: Name of the cluster
+        features: List of features in the cluster
+        type: Type of cluster (predefined or dynamic)
+    """
+    name: str
+    features: List[FeatureActivation]
+    type: Literal["predefined", "dynamic"]
+
+class ClusterFeaturesRequest(BaseModel):
+    """Model for feature clustering requests.
+    
+    Attributes:
+        features: List of features to cluster
+        session_id: Session ID
+        variant_id: Optional variant ID
+        force_refresh: Whether to force a refresh of cached results
+    """
+    features: List[FeatureActivation]
+    session_id: str
+    variant_id: Optional[str] = None
+    force_refresh: bool = False
+
+class ClusteredFeaturesResponse(BaseModel):
+    """Response model for feature clustering.
+    
+    Attributes:
+        clusters: List of feature clusters
+    """
+    clusters: List[FeatureCluster] 

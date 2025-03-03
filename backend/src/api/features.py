@@ -7,13 +7,17 @@ from ..models.features import (
     SteerFeatureResponse,
     ModifiedFeature,
     ClearFeatureRequest,
-    ClearFeatureResponse
+    ClearFeatureResponse,
+    FeatureCluster,
+    ClusterFeaturesRequest,
+    ClusteredFeaturesResponse
 )
 from ..core.services import EmberService
 from ..core.dependencies import get_ember_service
 from ..core.config import get_settings
 from pydantic import BaseModel
 import logging
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -114,9 +118,33 @@ async def search_features(
     request: SearchFeaturesRequest,
     ember_service: EmberService = Depends(get_ember_service)
 ) -> List[FeatureActivation]:
-    return await ember_service.search_features(
-        query=request.query,
-        session_id=request.session_id,
-        variant_id=request.variant_id,
-        top_k=request.top_k
-    ) 
+    """Search for features based on semantic similarity to a query string."""
+    try:
+        return await ember_service.search_features(
+            query=request.query,
+            session_id=request.session_id,
+            variant_id=request.variant_id,
+            top_k=request.top_k
+        )
+    except Exception as e:
+        logger.error(f"Error searching features: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/cluster", response_model=ClusteredFeaturesResponse)
+async def cluster_features(
+    request: ClusterFeaturesRequest,
+    ember_service: EmberService = Depends(get_ember_service)
+) -> ClusteredFeaturesResponse:
+    """Cluster features into logical groups."""
+    try:
+        clusters = await ember_service.cluster_features(
+            features=request.features,
+            session_id=request.session_id,
+            variant_id=request.variant_id,
+            force_refresh=request.force_refresh
+        )
+        
+        return ClusteredFeaturesResponse(clusters=clusters)
+    except Exception as e:
+        logger.error(f"Error clustering features: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) 
