@@ -1,6 +1,4 @@
-import { useState } from 'react';
-import { FeatureActivation, SteerFeatureResponse, FeatureCluster } from "@/types/features";
-import { useFeatureCardVariant } from './variants';
+import { useFeatureCardVariant } from '../feature-card';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { 
   Accordion,
@@ -9,18 +7,14 @@ import {
   AccordionTrigger
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-
-export interface ClusteredFeatureListProps {
-  clusters: FeatureCluster[];
-  onSteer?: (response: SteerFeatureResponse) => void;
-  variantId?: string;
-}
+import { FeatureListProps } from './variants';
 
 export function ClusteredFeatureList({ 
+  features,
   clusters, 
   onSteer, 
   variantId 
-}: ClusteredFeatureListProps) {
+}: FeatureListProps) {
   const FeatureCardVariant = useFeatureCardVariant();
   
   // If there are no clusters, show a message
@@ -34,7 +28,7 @@ export function ClusteredFeatureList({
 
   return (
     <div className="space-y-2">
-      <Accordion type="multiple" defaultValue={clusters.filter(c => c.type === "predefined").map(c => c.name)}>
+      <Accordion type="multiple">
         {clusters.map((cluster) => (
           <AccordionItem 
             key={cluster.name} 

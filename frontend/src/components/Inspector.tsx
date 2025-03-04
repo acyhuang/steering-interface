@@ -13,13 +13,7 @@ import {
 } from "@/types/features"
 import { featuresApi } from "@/lib/api"
 import { useFeatureCardVariant } from './feature-card'
-import { 
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger
-} from "@/components/ui/accordion"
-import { Badge } from "@/components/ui/badge"
+import { useFeatureListVariant } from './feature-list'
 
 interface InspectorProps {
   features?: FeatureActivation[];
@@ -54,6 +48,7 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
   const [isClusteringLoading, setIsClusteringLoading] = useState(false)
   
   const FeatureCardVariant = useFeatureCardVariant();
+  const FeatureListVariant = useFeatureListVariant();
 
   const fetchClusters = useCallback(async () => {
     if (!localFeatures || localFeatures.length === 0) return;
@@ -213,71 +208,13 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
       );
     }
 
-    if (clusters && clusters.length > 0) {
-      console.log('[INSPECTOR_DEBUG] Rendering clusters view with:', {
-        numClusters: clusters.length,
-        clusterNames: clusters.map(c => c.name),
-        totalFeatures: clusters.reduce((acc, c) => acc + c.features.length, 0)
-      });
-      return (
-        <div className="space-y-2">
-          <Accordion 
-            type="multiple" 
-            className="space-y-2"
-          >
-            {clusters.map((cluster) => (
-              <AccordionItem 
-                key={cluster.name} 
-                value={cluster.name}
-                className="border rounded-md overflow-hidden"
-              >
-                <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{cluster.name}</span>
-                      <Badge variant={cluster.type === "predefined" ? "default" : "secondary"}>
-                        {cluster.features.length}
-                      </Badge>
-                    </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-4 pb-3 pt-1">
-                  <div className="space-y-2">
-                    {cluster.features.map((feature, idx) => (
-                      <FeatureCardVariant
-                        key={`${cluster.name}-${idx}`}
-                        feature={feature}
-                        onSteer={handleSteer}
-                        variantId={variantId}
-                      />
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
-      );
-    }
-
-    console.log('[INSPECTOR_DEBUG] Falling back to unclustered view:', {
-      reason: 'Clusters condition failed',
-      clusters,
-      clustersLength: clusters?.length
-    });
-    
-    // Fallback to unclustered view if clustering failed
     return (
-      <div className="space-y-2 pr-4">
-        {localFeatures.map((feature, index) => (
-          <FeatureCardVariant
-            key={index} 
-            feature={feature}
-            onSteer={handleSteer}
-            variantId={variantId}
-          />
-        ))}
-      </div>
+      <FeatureListVariant
+        features={localFeatures}
+        clusters={clusters}
+        onSteer={handleSteer}
+        variantId={variantId}
+      />
     );
   };
 
