@@ -14,6 +14,7 @@ import {
 import { featuresApi } from "@/lib/api"
 import { useFeatureCardVariant } from './feature-card'
 import { useFeatureListVariant } from './feature-list'
+import { useLogger } from '@/lib/logger'
 
 interface InspectorProps {
   features?: FeatureActivation[];
@@ -35,6 +36,7 @@ interface VariantResponse {
 }
 
 export function Inspector({ features, isLoading, variantId = "default" }: InspectorProps) {
+  const logger = useLogger('Inspector')
   const [searchQuery, setSearchQuery] = useState("")
   const [localFeatures, setLocalFeatures] = useState(features || [])
   const [variantJson, setVariantJson] = useState<VariantResponse | null>(null)
@@ -50,12 +52,35 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
   const FeatureCardVariant = useFeatureCardVariant();
   const FeatureListVariant = useFeatureListVariant();
 
+  // Log initial mount
+  useEffect(() => {
+    logger.debug('Inspector component mounted');
+    return () => {
+      logger.debug('Inspector component unmounted');
+    };
+  }, [logger]);
+
+  // Log feature changes
+  useEffect(() => {
+    if (features) {
+      logger.debug('Features updated', { 
+        count: features.length,
+        hasClusters: clusters.length > 0
+      });
+    }
+  }, [features, clusters.length, logger]);
+
+  // Log tab changes
+  useEffect(() => {
+    logger.debug('Tab changed', { selectedTab, variantId });
+  }, [selectedTab, variantId, logger]);
+
   const fetchClusters = useCallback(async () => {
     if (!localFeatures || localFeatures.length === 0) return;
     
     setIsClusteringLoading(true);
     try {
-      console.log('[INSPECTOR_DEBUG] Fetching clusters for features:', localFeatures.length);
+      logger.debug('Fetching clusters for features', { featureCount: localFeatures.length });
       const response = await featuresApi.clusterFeatures(
         localFeatures,
         variantId,
@@ -63,26 +88,20 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
         false
       );
       
-      console.log('[INSPECTOR_DEBUG] Raw API response:', response);
-      
-      // Extract the clusters array from the response
       const clusteredFeatures = response?.clusters || [];
-      
-      console.log('[INSPECTOR_DEBUG] Extracted clusters:', {
-        isArray: Array.isArray(clusteredFeatures),
-        length: clusteredFeatures?.length,
-        firstCluster: clusteredFeatures?.[0],
-        hasFeatures: clusteredFeatures?.[0]?.features?.length > 0
-      });
-      
       setClusters(clusteredFeatures);
+      
+      logger.debug('Clusters updated', {
+        count: clusteredFeatures.length,
+        featuresCount: localFeatures.length
+      });
     } catch (error) {
-      console.error('[INSPECTOR_DEBUG] Failed to fetch clusters:', error);
+      logger.error('Failed to fetch clusters', { error });
       setClusters([]);
     } finally {
       setIsClusteringLoading(false);
     }
-  }, [localFeatures, variantId]);
+  }, [localFeatures, variantId, logger]);
 
   useEffect(() => {
     setLocalFeatures(features || [])
@@ -95,10 +114,10 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
 
   const fetchVariantJson = useCallback(async () => {
     setIsLoadingModified(true)
-    console.log('[INSPECTOR_DEBUG] Fetching modified features for variant:', variantId);
+    logger.debug('Fetching modified features for variant', { variantId });
     try {
       const response = await featuresApi.getModifiedFeatures(variantId);
-      console.log('[INSPECTOR_DEBUG] Received variant state:', response);
+      logger.debug('Received variant state', { response });
       setVariantJson(response);
       
       // Transform variant JSON into FeatureActivation format
@@ -112,22 +131,22 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
         setModifiedFeatures([]);
       }
     } catch (error) {
-      console.error('[INSPECTOR_DEBUG] Failed to fetch variant state:', error);
+      logger.error('Failed to fetch variant state', { error });
       setModifiedFeatures([]);
     } finally {
       setIsLoadingModified(false)
     }
-  }, [variantId]);
+  }, [variantId, logger]);
 
   useEffect(() => {
-    console.log('[INSPECTOR_DEBUG] Tab or variant changed - selectedTab:', selectedTab, 'variantId:', variantId);
+    logger.debug('Tab or variant changed', { selectedTab, variantId });
     if (selectedTab === "modified") {
       fetchVariantJson();
     }
   }, [selectedTab, fetchVariantJson]);
 
   const handleSteer = async (response: SteerFeatureResponse) => {
-    console.log('[INSPECTOR_DEBUG] Handling steer response:', response);
+    logger.debug('Handling steer response', { response });
     
     const steerRequest = {
       session_id: variantId,
@@ -135,7 +154,7 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
       feature_label: response.label,
       value: response.activation
     };
-    console.log('[INSPECTOR_DEBUG] Making steer request with:', steerRequest);
+    logger.debug('Making steer request', { request: steerRequest });
     
     setLocalFeatures(current => 
       current.map(f => 
@@ -146,7 +165,7 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
     );
 
     if (selectedTab === "modified") {
-      console.log('[INSPECTOR_DEBUG] On modified tab, fetching updated variant state');
+      logger.debug('On modified tab, fetching updated variant state');
       await fetchVariantJson();
     }
 
@@ -165,7 +184,7 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
     setShowSearchResults(true);
     
     try {
-      console.log("Searching for features with query:", searchQuery);
+      logger.debug("Searching for features with query", { query: searchQuery });
       const results = await featuresApi.searchFeatures({
         query: searchQuery,
         session_id: variantId,
@@ -173,10 +192,10 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
         top_k: 10
       });
       
-      console.log("Search results:", results);
+      logger.debug("Search results", { results });
       setSearchResults(results);
     } catch (error) {
-      console.error("Error searching features:", error);
+      logger.error("Error searching features", { error });
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -188,14 +207,6 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
   }
 
   const renderActivatedFeatures = () => {
-    console.log('[INSPECTOR_DEBUG] Rendering activated features:', {
-      isLoading,
-      isClusteringLoading,
-      hasClusters: clusters && clusters.length > 0,
-      clustersLength: clusters?.length,
-      localFeaturesLength: localFeatures?.length
-    });
-
     if (isLoading || isClusteringLoading) {
       return <div className="text-sm text-gray-500">Loading features...</div>;
     }

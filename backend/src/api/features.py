@@ -40,7 +40,7 @@ async def inspect_features(
     ember_service: EmberService = Depends(get_ember_service)
 ) -> List[FeatureActivation]:
     """Inspect feature activations in the current conversation."""
-    logger.info(f"(1 of 2) Received feature inspection request for session {request.session_id}")
+    logger.info(f"Received feature inspection request for session {request.session_id}")
     
     try:
         features = await ember_service.inspect_features(
@@ -49,7 +49,7 @@ async def inspect_features(
             variant_id=request.variant_id
         )
         
-        logger.info(f"(2 of 2) Successfully inspected features: found {len(features)} activations")
+        logger.info(f"Successfully inspected features: found {len(features)} activations")
         return features
         
     except Exception as e:
@@ -88,7 +88,7 @@ async def get_modified_features(
 ) -> Dict:
     """Get raw variant JSON state"""
     logger.info(f"[API_DEBUG] get_modified_features called with session_id={session_id}, variant_id={variant_id}")
-    return ember_service.get_modified_features(session_id, variant_id)
+    return await ember_service.get_modified_features(session_id, variant_id)
 
 @router.post("/clear", response_model=ClearFeatureResponse)
 async def clear_feature(
