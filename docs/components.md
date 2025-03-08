@@ -12,6 +12,10 @@ This document outlines both currently implemented features and planned future en
 - Manages chat history display
 - Triggers feature inspection on new messages
 - Integrates with current model variant settings for completions
+- **Logging**:
+  - INFO: Message send/receive events, variant changes
+  - DEBUG: Message processing details, state updates
+  - ERROR: Message failures, connection issues
 
 ### Inspector Panel ✓
 - Displays current feature activations
@@ -20,6 +24,11 @@ This document outlines both currently implemented features and planned future en
 - Shows feature search and filtering options
 - Semantic feature search with overlay results display
 - Allows steering of search results
+- **Logging**:
+  - INFO: Feature modifications, search operations
+  - DEBUG: Feature state changes, UI updates
+  - TRACE: Detailed feature data, search results
+  - ERROR: Feature operation failures
 
 ### TestBench Control Panel 🚧 TODO
 - Manages UI/UX testing configurations
@@ -39,6 +48,12 @@ This document outlines both currently implemented features and planned future en
 - Manages basic responses (🚧 TODO: Streaming responses)
 - Integrates model variant settings into completions
 - Basic error handling (🚧 TODO: Retry logic and advanced error cases)
+- **Logging**:
+  - INFO: Completion requests, major state changes
+  - DEBUG: Request details, response processing
+  - TRACE: Full request/response payloads
+  - WARNING: Rate limits, performance issues
+  - ERROR: SDK failures, completion errors
 
 ### Feature Management Service ✓
 - Provides a secure wrapper around the Ember SDK
@@ -48,6 +63,12 @@ This document outlines both currently implemented features and planned future en
 - Coordinates with model variant system
 - 🚧 TODO: Rate limiting and usage monitoring
 - 🚧 TODO: Advanced SDK version compatibility handling
+- **Logging**:
+  - INFO: Feature modifications, variant updates
+  - DEBUG: Feature operations, SDK interactions
+  - TRACE: Complete feature payloads, SDK responses
+  - WARNING: Rate limits, SDK warnings
+  - ERROR: SDK exceptions, operation failures
 
 ### TestBench Service 🚧 TODO
 - Manages UI/UX test configurations
@@ -84,15 +105,32 @@ This document outlines both currently implemented features and planned future en
 
 ### Current Implementation ✓
 
+#### Logging Standards
+- Use structured logging format
+- Include component context
+- Add correlation IDs for request tracking
+- Log state transitions at appropriate levels:
+  - Major state changes: INFO
+  - Detailed state updates: DEBUG
+  - Complete state dumps: TRACE
+
 #### Chat Interface
 - Message history (in-memory)
 - Current completion status
 - Stream status
+- **Logging**:
+  - State transitions
+  - Error conditions
+  - Performance metrics
 
 #### Inspector Panel
 - Current feature activations
 - Modified features
 - Search state
+- **Logging**:
+  - Feature modifications
+  - Search operations
+  - UI state changes
 
 ### Future Implementation 🚧 TODO
 

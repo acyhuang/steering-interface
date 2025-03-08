@@ -31,7 +31,7 @@ def assign_to_predefined_clusters(features: List[FeatureActivation]) -> Dict[str
     reasoning_method = []
     remaining = []
     
-    logger.info(f"Assigning {len(features)} features to predefined clusters")
+    logger.debug(f"Assigning {len(features)} features to predefined clusters")
     
     for feature in features:
         label = feature.label.lower()        
@@ -71,22 +71,12 @@ async def cluster_features(
     num_categories: int = 5,
     force_refresh: bool = False
 ) -> List[FeatureCluster]:
-    """Cluster features into predefined and dynamic groups.
-    
-    Args:
-        llm_client: LLM client for dynamic clustering
-        features: List of features to cluster
-        num_categories: Target number of categories
-        force_refresh: Whether to force a refresh of cached results
-        
-    Returns:
-        List of feature clusters
-    """
+    """Cluster features into predefined and dynamic groups."""
     if not features:
         logger.warning("No features to cluster")
         return []
     
-    logger.info(f"Clustering {len(features)} features (num_categories={num_categories}, force_refresh={force_refresh})")
+    logger.debug(f"Starting clustering of {len(features)} features")
     
     # First, assign features to predefined clusters
     clustered = assign_to_predefined_clusters(features)
@@ -106,7 +96,7 @@ async def cluster_features(
         try:
             # Extract just the labels for classification
             feature_labels = [f.label for f in clustered["remaining"]]
-            logger.info(f"Using LLM to cluster {len(feature_labels)} remaining features")
+            logger.debug(f"Using LLM to cluster {len(feature_labels)} remaining features")
             
             # Get classification from LLM
             classification = await llm_client.cluster_features(
@@ -115,7 +105,7 @@ async def cluster_features(
                 force_refresh=force_refresh
             )
             
-            logger.info(f"LLM returned {len(classification)} clusters: {list(classification.keys())}")
+            logger.debug(f"LLM returned {len(classification)} clusters: {list(classification.keys())}")
             
             # Convert to FeatureCluster objects
             for category_name, feature_labels in classification.items():
@@ -126,7 +116,6 @@ async def cluster_features(
                 ]
                 
                 if category_features:
-                    # logger.info(f"Adding dynamic cluster '{category_name}' with {len(category_features)} features")
                     result.append(FeatureCluster(
                         name=category_name,
                         features=category_features,
@@ -143,5 +132,5 @@ async def cluster_features(
                     type="dynamic"
                 ))
     
-    # logger.info(f"Returning {len(result)} clusters")
+    logger.debug(f"Completed clustering with {len(result)} clusters")
     return result 

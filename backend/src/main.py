@@ -2,9 +2,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api import chat, features
 from dotenv import load_dotenv
+from .core.logging import setup_logging
+from .core.config import get_settings
 
+# Load environment variables
 load_dotenv()
 
+# Initialize logging
+settings = get_settings()
+setup_logging(env=settings.APP_ENV)
+
+# Create FastAPI application
 app = FastAPI(title="Steering Interface Backend")
 
 # Add CORS middleware

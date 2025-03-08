@@ -87,11 +87,11 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
   useEffect(() => {
     setLocalFeatures(features || [])
     
-    // Fetch clusters whenever features change
-    if (features && features.length > 0) {
+    // Only fetch clusters if we don't already have them for these features
+    if (features && features.length > 0 && (!clusters || clusters.length === 0)) {
       fetchClusters();
     }
-  }, [features, fetchClusters])
+  }, [features, fetchClusters, clusters])
 
   const fetchVariantJson = useCallback(async () => {
     setIsLoadingModified(true)

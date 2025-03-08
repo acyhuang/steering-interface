@@ -59,16 +59,11 @@ class LLMClient:
     """Client for interacting with LLM APIs for auxiliary tasks."""
     
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o-mini"):
-        """Initialize the LLM client.
-        
-        Args:
-            api_key: OpenAI API key
-            model: OpenAI model to use
-        """
+        """Initialize the LLM client."""
         if not api_key:
             logger.error("No API key provided for LLM client")
         else:
-            logger.info(f"Initializing LLM client with API key: {api_key[:4]}...{api_key[-4:]}")
+            logger.debug(f"Initializing LLM client with API key: {api_key[:4]}...{api_key[-4:]}")
         
         self.client = AsyncOpenAI(api_key=api_key)
         self.model = model
@@ -81,16 +76,7 @@ class LLMClient:
         num_categories: int = 5,
         force_refresh: bool = False
     ) -> Dict[str, List[str]]:
-        """Cluster features into logical categories using LLM.
-        
-        Args:
-            features: List of feature labels to cluster
-            num_categories: Target number of categories (excluding predefined ones)
-            force_refresh: Whether to force a refresh of cached results
-            
-        Returns:
-            Dictionary mapping category names to lists of feature labels
-        """
+        """Cluster features into logical categories using LLM."""
         if not features:
             logger.warning("No features to cluster")
             return {}
@@ -102,7 +88,7 @@ class LLMClient:
         if not force_refresh:
             cached_result = self.cache.get(cache_key)
             if cached_result:
-                logger.info(f"Using cached clustering result for {len(features)} features")
+                logger.debug(f"Using cached clustering result for {len(features)} features")
                 return cached_result
         
         # Prepare feature list for the prompt
@@ -125,11 +111,11 @@ class LLMClient:
         }}
         """
         
-        logger.info(f"Prompt for LLM clustering:\n{prompt}")
+        logger.debug(f"Prompt for LLM clustering:\n{prompt}")
         
         try:
-            logger.info(f"Sending clustering request to OpenAI for {len(features)} features using model {self.model}")
-            logger.info(f"API key status: {'Set' if self.client.api_key else 'Not set'}")
+            logger.debug(f"Sending clustering request to OpenAI for {len(features)} features using model {self.model}")
+            logger.debug(f"API key status: {'Set' if self.client.api_key else 'Not set'}")
             
             try:
                 response = await self.client.chat.completions.create(
@@ -140,16 +126,16 @@ class LLMClient:
                 )
                 
                 content = response.choices[0].message.content
-                logger.info(f"Received response from OpenAI: {content}")
+                logger.debug(f"Received response from OpenAI: {content}")
                 
                 try:
                     result = json.loads(content)
-                    logger.info(f"Successfully parsed JSON response with {len(result)} categories")
+                    logger.debug(f"Successfully parsed JSON response with {len(result)} categories")
                     
                     # Cache the result
                     self.cache.set(cache_key, result)
                     
-                    logger.info(f"Successfully clustered {len(features)} features into {len(result)} categories: {list(result.keys())}")
+                    logger.debug(f"Successfully clustered {len(features)} features into {len(result)} categories")
                     return result
                 except json.JSONDecodeError as json_err:
                     logger.error(f"Failed to parse JSON response: {str(json_err)}")

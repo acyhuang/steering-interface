@@ -170,11 +170,73 @@ class RateLimitedClient(AsyncClient):
 
 ## Current Best Practices ✓
 
-1. Always use `async/await` with the SDK for better performance
-2. Use comprehensive logging for debugging and monitoring
-3. Use Pydantic models for request/response validation
-4. Basic error handling with try/except blocks
-5. Use proper session and variant management through EmberService
+### 1. Asynchronous Operations
+- Always use `async/await` with the SDK for better performance
+- Handle async errors properly with try/catch blocks
+
+### 2. Logging Standards
+- Use structured logging with consistent format
+- Follow progressive logging levels:
+  ```python
+  # ERROR: SDK exceptions and critical failures
+  logger.error("Failed to create chat completion", exc_info=True)
+  
+  # WARNING: SDK warnings and performance issues
+  logger.warning("Rate limit threshold reached: %d requests/min", rate)
+  
+  # INFO: Major operations and state changes
+  logger.info("Created new variant: %s", variant_id)
+  
+  # DEBUG: Detailed operation information
+  logger.debug("Feature steering applied: %s=%f", feature_label, value)
+  
+  # TRACE: Complete payload logging
+  logger.trace("Full variant state: %s", variant.json())
+  ```
+
+### 3. SDK Error Handling
+- Use comprehensive try/except blocks
+- Log appropriate context with errors
+- Include correlation IDs in logs
+  ```python
+  try:
+      response = await client.chat.completions.create(...)
+  except Exception as e:
+      logger.error(
+          "Chat completion failed",
+          extra={
+              "correlation_id": session_id,
+              "error": str(e),
+              "variant_id": variant_id
+          }
+      )
+      raise
+  ```
+
+### 4. Performance Monitoring
+- Log timing information for SDK operations
+- Track rate limits and quotas
+- Monitor resource usage
+  ```python
+  start_time = time.time()
+  try:
+      result = await sdk_operation()
+      duration = time.time() - start_time
+      logger.debug(
+          "SDK operation completed",
+          extra={
+              "duration_ms": duration * 1000,
+              "operation": "sdk_operation"
+          }
+      )
+  except Exception as e:
+      logger.error("SDK operation failed", exc_info=True)
+  ```
+
+### 5. Data Validation
+- Use Pydantic models for request/response validation
+- Log validation errors appropriately
+- Include validation context in logs
 
 ## Future Best Practices 🚧 TODO
 
@@ -268,14 +330,30 @@ The SDK provides specific exceptions we should handle:
 
 ```python
 from goodfire.exceptions import InferenceAbortedException
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     response = await client.chat.completions.create(
         messages=messages,
         model=variant
     )
-except InferenceAbortedException:
+except InferenceAbortedException as e:
+    logger.error(
+        "Generation aborted by safety filters",
+        extra={
+            "session_id": session_id,
+            "error_type": "safety_filter",
+            "details": str(e)
+        }
+    )
     return {"error": "Generation aborted by safety filters"}
 except Exception as e:
+    logger.error(
+        "Unexpected error during chat completion",
+        exc_info=True,
+        extra={"session_id": session_id}
+    )
     return {"error": f"Unexpected error: {str(e)}"}
 ```

@@ -4,19 +4,15 @@ from ..models.chat import ChatMessage, ChatRequest, ChatResponse
 from ..models.features import FeatureActivation, SteerFeatureResponse, ClearFeatureResponse, ModifiedFeature, FeatureCluster, ClusteredFeaturesResponse
 import logging
 from .config import Settings
-import json  # Add this import at the top
+import json
 from .llm_client import LLMClient
 from .clustering import cluster_features
+from .logging import log_timing, with_correlation_id
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-# Set httpx logger to WARNING to reduce noise
-logging.getLogger("httpx").setLevel(logging.WARNING)
-
+# Initialize logger
 logger = logging.getLogger(__name__)
+
+# logger.setLevel(logging.DEBUG)
 
 class EmberService:
     """Service for interacting with the Ember API.
@@ -37,7 +33,11 @@ class EmberService:
         
         # Initialize LLM client with API key from settings
         api_key = settings.get_openai_api_key
-        logger.info(f"Initializing LLM client with API key: {'Set' if api_key else 'Not set'}")
+        logger.info("Initializing EmberService", extra={
+            "api_key_set": bool(api_key),
+            "model": settings.openai_model
+        })
+        
         self.llm_client = LLMClient(
             api_key=api_key,
             model=settings.openai_model
@@ -53,29 +53,52 @@ class EmberService:
             self.variants[session_id] = {}
         
         if "default" not in self.variants[session_id]:
-            self.variants[session_id]["default"] = Variant("meta-llama/Llama-3.3-70B-Instruct")
+            logger.debug("Creating default variant", extra={
+                "session_id": session_id,
+                "model": self.settings.default_model
+            })
+            self.variants[session_id]["default"] = Variant(self.settings.default_model)
         
         return self.variants[session_id]["default"]
     
-    def create_variant(self, session_id: str, variant_id: str, base_variant_id: Optional[str] = None) -> Variant:
+    @with_correlation_id()
+    async def create_variant(self, session_id: str, variant_id: str, base_variant_id: Optional[str] = None) -> Variant:
         """Create a new variant, optionally based on an existing one."""
+        logger.info("Creating new variant", extra={
+            "session_id": session_id,
+            "variant_id": variant_id,
+            "base_variant_id": base_variant_id
+        })
+        
         if session_id not in self.variants:
             self.variants[session_id] = {}
             
         if base_variant_id:
             base = self.variants[session_id].get(base_variant_id)
             if not base:
+                logger.error("Base variant not found", extra={
+                    "session_id": session_id,
+                    "base_variant_id": base_variant_id
+                })
                 raise ValueError(f"Base variant {base_variant_id} not found")
+            
             # Create new variant with same settings as base
-            new_variant = Variant(base.model_name)  # You might need to copy other settings
+            new_variant = Variant(base.model_name)
         else:
             # Create fresh variant
-            new_variant = Variant("meta-llama/Llama-3.3-70B-Instruct")
+            new_variant = Variant(self.settings.default_model)
             
         self.variants[session_id][variant_id] = new_variant
+        logger.debug("Variant created successfully", extra={
+            "session_id": session_id,
+            "variant_id": variant_id,
+            "model": new_variant.model_name
+        })
+        
         return new_variant
     
-    def get_variant(self, session_id: str, variant_id: Optional[str] = None) -> Variant:
+    @with_correlation_id()
+    async def get_variant(self, session_id: str, variant_id: Optional[str] = None) -> Variant:
         """Get a variant by session_id and variant_id.
         
         Args:
@@ -86,16 +109,25 @@ class EmberService:
             Variant object
         """
         variant_id = variant_id or "default"
-        logger.info(f"Getting variant for session {session_id}, variant {variant_id}")
+        logger.debug("Getting variant", extra={
+            "session_id": session_id,
+            "variant_id": variant_id
+        })
         
         try:
             # Check if we have this variant cached
             if session_id in self.variants and variant_id in self.variants[session_id]:
-                logger.info(f"Using cached variant for session {session_id}, variant {variant_id}")
+                logger.debug("Using cached variant", extra={
+                    "session_id": session_id,
+                    "variant_id": variant_id
+                })
                 return self.variants[session_id][variant_id]
             
             # Create a new variant
-            logger.info(f"Creating new variant for session {session_id}, variant {variant_id}")
+            logger.info("Creating new variant", extra={
+                "session_id": session_id,
+                "variant_id": variant_id
+            })
             variant = self._get_default_variant(session_id)
             
             # Cache the variant
@@ -105,10 +137,15 @@ class EmberService:
             
             return variant
         except Exception as e:
-            logger.error(f"Error getting variant: {str(e)}")
-            logger.error(f"Using default variant as fallback")
+            logger.error("Error getting variant", exc_info=True, extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "error": str(e)
+            })
             return self._get_default_variant(session_id)
     
+    @with_correlation_id()
+    @log_timing(logger)
     async def create_chat_completion(
         self,
         messages: List[ChatMessage],
@@ -121,11 +158,25 @@ class EmberService:
     ) -> ChatResponse:
         """Create a chat completion using the Ember API."""
         try:
-            logger.info(f"Creating chat completion for variant {variant_id}")
+            logger.debug("Creating chat completion", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "message_count": len(messages)
+            })
             
-            variant = self.get_variant(session_id, variant_id)
-            variant_json = variant.json()
-            logger.info(f"Variant JSON: {json.dumps(variant_json, indent=2)}")
+            # Get variant asynchronously
+            variant = await self.get_variant(session_id, variant_id)
+            
+            # Log full variant state at DEBUG level
+            logger.debug("Using variant configuration", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "stream": stream,
+                "max_tokens": max_completion_tokens,
+                "temperature": temperature,
+                "top_p": top_p,
+                "variant_state": variant.json()
+            })
             
             response = await self.client.chat.completions.create(
                 messages=[{"role": msg.role, "content": msg.content} for msg in messages],
@@ -138,20 +189,46 @@ class EmberService:
             
             content = response.choices[0].message["content"] if response.choices else ""
             
+            # Convert variant.json() to a JSON string
+            variant_json_str = json.dumps(variant.json())
+            
+            logger.debug("Chat completion successful", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "content_length": len(content)
+            })
+            
             return ChatResponse(
                 content=content,
                 variant_id=variant_id or "default",
-                variant_json=json.dumps(variant_json)  # Convert dict to JSON string
+                variant_json=variant_json_str
             )
             
         except Exception as e:
-            logger.error(f"Error in create_chat_completion: {str(e)}")
+            logger.error("Chat completion failed", exc_info=True, extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "error": str(e)
+            })
             raise
 
-    async def inspect_features(self, messages: List[ChatMessage], session_id: str, variant_id: Optional[str] = None) -> List[FeatureActivation]:
+    @with_correlation_id()
+    @log_timing(logger)
+    async def inspect_features(
+        self,
+        messages: List[ChatMessage],
+        session_id: str,
+        variant_id: Optional[str] = None
+    ) -> List[FeatureActivation]:
         """Inspect feature activations in the current conversation."""
         try:
-            variant = self.get_variant(session_id, variant_id)
+            logger.debug("Inspecting features", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "message_count": len(messages)
+            })
+            
+            variant = await self.get_variant(session_id, variant_id)
             
             inspector = await self.client.features.inspect(
                 messages=[{"role": msg.role, "content": msg.content} for msg in messages],
@@ -165,12 +242,24 @@ class EmberService:
                     activation=activation.activation
                 ))
             
+            logger.debug("Feature inspection complete", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "activation_count": len(activations)
+            })
+            
             return activations
             
         except Exception as e:
-            logger.error(f"Error in inspect_features: {str(e)}")
-            raise 
+            logger.error("Feature inspection failed", exc_info=True, extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "error": str(e)
+            })
+            raise
 
+    @with_correlation_id()
+    @log_timing(logger)
     async def steer_feature(
         self,
         session_id: str,
@@ -180,9 +269,14 @@ class EmberService:
     ) -> SteerFeatureResponse:
         """Steer a feature's activation value."""
         try:
-            logger.info(f"[VARIANT_DEBUG] Steering feature for session={session_id}, variant={variant_id}")
-            variant = self.get_variant(session_id, variant_id)
-            logger.info(f"[VARIANT_DEBUG] Pre-steering variant state: {json.dumps(variant.json(), indent=2)}")
+            logger.info("Steering feature", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "feature": feature_label,
+                "value": value
+            })
+            
+            variant = await self.get_variant(session_id, variant_id)
             
             # Search for the feature
             features = await self.client.features.search(
@@ -192,41 +286,69 @@ class EmberService:
             )
             
             if not features:
+                logger.warning("Feature not found", extra={
+                    "session_id": session_id,
+                    "variant_id": variant_id,
+                    "feature": feature_label
+                })
                 raise ValueError(f"Feature '{feature_label}' not found")
                 
             feature = features[0]
             
             # Apply the steering
             variant.set(feature, value)
-            logger.info(f"[VARIANT_DEBUG] Post-steering variant state: {json.dumps(variant.json(), indent=2)}")
+            logger.debug("Feature steering applied", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "feature": feature_label,
+                "value": value
+            })
             
             # Return response with the values we set
             return SteerFeatureResponse(
                 label=feature_label,
-                activation=value,  # Use the value we set since we can't verify
+                activation=value,
                 modified_value=value
             )
             
         except Exception as e:
-            logger.error(f"Error in steer_feature: {str(e)}")
-            raise 
+            logger.error("Feature steering failed", exc_info=True, extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "feature": feature_label,
+                "value": value,
+                "error": str(e)
+            })
+            raise
 
-    def get_modified_features(self, session_id: str, variant_id: Optional[str] = None) -> Dict:
+    @with_correlation_id()
+    @log_timing(logger)
+    async def get_modified_features(self, session_id: str, variant_id: Optional[str] = None) -> Dict:
         """Get the variant's raw JSON state.
         
         Returns the complete variant JSON which includes all modifications and settings.
         """
         try:
-            logger.info(f"[VARIANT_DEBUG] Getting modified features for session={session_id}, variant={variant_id}")
-            variant = self.get_variant(session_id, variant_id)
+            logger.debug("Getting modified features", extra={
+                "session_id": session_id,
+                "variant_id": variant_id
+            })
+            
+            variant = await self.get_variant(session_id, variant_id)
             variant_json = variant.json()
-            logger.info(f"[VARIANT_DEBUG] Current variant state: {json.dumps(variant_json, indent=2)}")
-            return variant_json  # Return raw dict for API endpoint
+            
+            return variant_json
             
         except Exception as e:
-            logger.error(f"Error getting variant JSON: {str(e)}")
+            logger.error("Failed to get modified features", exc_info=True, extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "error": str(e)
+            })
             raise
 
+    @with_correlation_id()
+    @log_timing(logger)
     async def clear_feature(
         self,
         session_id: str,
@@ -235,9 +357,13 @@ class EmberService:
     ) -> ClearFeatureResponse:
         """Clear a feature's modifications from the variant."""
         try:
-            logger.info(f"[VARIANT_DEBUG] Clearing feature for session={session_id}, variant={variant_id}")
-            variant = self.get_variant(session_id, variant_id)
-            logger.info(f"[VARIANT_DEBUG] Pre-clearing variant state: {json.dumps(variant.json(), indent=2)}")
+            logger.info("Clearing feature", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "feature": feature_label
+            })
+            
+            variant = await self.get_variant(session_id, variant_id)
             
             # Search for the feature
             features = await self.client.features.search(
@@ -247,13 +373,22 @@ class EmberService:
             )
             
             if not features:
+                logger.warning("Feature not found for clearing", extra={
+                    "session_id": session_id,
+                    "variant_id": variant_id,
+                    "feature": feature_label
+                })
                 raise ValueError(f"Feature '{feature_label}' not found")
                 
             feature = features[0]
             
             # Clear the feature
             variant.clear(feature)
-            logger.info(f"[VARIANT_DEBUG] Post-clearing variant state: {json.dumps(variant.json(), indent=2)}")
+            logger.debug("Feature cleared", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "feature": feature_label
+            })
             
             # Return response with the cleared feature label
             return ClearFeatureResponse(
@@ -261,9 +396,16 @@ class EmberService:
             )
             
         except Exception as e:
-            logger.error(f"Error in clear_feature: {str(e)}")
+            logger.error("Failed to clear feature", exc_info=True, extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "feature": feature_label,
+                "error": str(e)
+            })
             raise
 
+    @with_correlation_id()
+    @log_timing(logger)
     async def search_features(
         self,
         query: str,
@@ -273,7 +415,14 @@ class EmberService:
     ) -> List[FeatureActivation]:
         """Search for features based on semantic similarity to a query string."""
         try:
-            variant = self.get_variant(session_id, variant_id)
+            logger.debug("Starting feature search", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "query": query,
+                "top_k": top_k
+            })
+            
+            variant = await self.get_variant(session_id, variant_id)
             
             # Use the SDK to search for features
             features = await self.client.features.search(
@@ -296,11 +445,23 @@ class EmberService:
                     activation=activation
                 ))
             
-            logger.info(f"Found {len(result)} features for query: {query}")
+            logger.info("Feature search completed", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "query": query,
+                "results_count": len(result)
+            })
+            
             return result
+            
         except Exception as e:
-            logger.error(f"Error searching features: {str(e)}")
-            raise 
+            logger.error("Feature search failed", exc_info=True, extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "query": query,
+                "error": str(e)
+            })
+            raise
 
     async def cluster_features(
         self,
@@ -310,28 +471,18 @@ class EmberService:
         force_refresh: bool = False,
         num_categories: int = 5
     ) -> List[FeatureCluster]:
-        """Cluster features into logical groups.
-        
-        Args:
-            features: List of features to cluster
-            session_id: Session ID
-            variant_id: Optional variant ID
-            force_refresh: Whether to force a refresh of cached results
-            num_categories: Target number of categories
-            
-        Returns:
-            List of feature clusters
-        """
+        """Cluster features into logical groups."""
         try:
-            logger.info(f"EmberService.cluster_features called with {len(features)} features for session {session_id}")
-            # logger.info(f"Feature labels: {[f.label for f in features]}")
+            logger.info(f"Starting feature clustering", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "feature_count": len(features)
+            })
             
             # Get the variant
-            variant = self.get_variant(session_id, variant_id)
-            # logger.info(f"Using variant: {variant}")
+            variant = await self.get_variant(session_id, variant_id)
             
             # Cluster the features
-            logger.info(f"Calling cluster_features with num_categories={num_categories}, force_refresh={force_refresh}")
             clusters = await cluster_features(
                 llm_client=self.llm_client,
                 features=features,
@@ -339,19 +490,27 @@ class EmberService:
                 force_refresh=force_refresh
             )
             
-            # logger.info(f"Received {len(clusters)} clusters from cluster_features")
-            # for i, cluster in enumerate(clusters):
-            #     logger.info(f"Cluster {i+1}: {cluster.name} (Type: {cluster.type}) with {len(cluster.features)} features")
-            #     logger.info(f"Features in cluster {i+1}: {[f.label for f in cluster.features]}")
+            logger.info("Feature clustering completed", extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "cluster_count": len(clusters),
+                "total_features": sum(len(c.features) for c in clusters)
+            })
             
             return clusters
+            
         except Exception as e:
-            logger.error(f"Error in EmberService.cluster_features: {str(e)}")
-            logger.error(f"Exception type: {type(e).__name__}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.error("Feature clustering failed", exc_info=True, extra={
+                "session_id": session_id,
+                "variant_id": variant_id,
+                "feature_count": len(features),
+                "error": str(e)
+            })
             # Fallback: return a single cluster with all features
-            logger.warning(f"Using fallback: returning all {len(features)} features in a single cluster")
+            logger.warning("Using fallback: single cluster for all features", extra={
+                "session_id": session_id,
+                "feature_count": len(features)
+            })
             return [FeatureCluster(
                 name="All Features",
                 features=features,

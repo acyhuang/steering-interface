@@ -27,7 +27,7 @@ async def create_chat_completion(
         HTTPException: If the request fails
     """
     try:
-        logger.info(f"(1 of 2) Received chat request")
+        logger.info(f"Received chat request")
         # logger.info(f"Received chat request: {request}")
         
         # For now, use a simple session ID. Later we'll implement proper session management
