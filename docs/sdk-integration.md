@@ -175,24 +175,150 @@ class RateLimitedClient(AsyncClient):
 - Handle async errors properly with try/catch blocks
 
 ### 2. Logging Standards
-- Use structured logging with consistent format
-- Follow progressive logging levels:
-  ```python
-  # ERROR: SDK exceptions and critical failures
-  logger.error("Failed to create chat completion", exc_info=True)
-  
-  # WARNING: SDK warnings and performance issues
-  logger.warning("Rate limit threshold reached: %d requests/min", rate)
-  
-  # INFO: Major operations and state changes
-  logger.info("Created new variant: %s", variant_id)
-  
-  # DEBUG: Detailed operation information
-  logger.debug("Feature steering applied: %s=%f", feature_label, value)
-  
-  # TRACE: Complete payload logging
-  logger.trace("Full variant state: %s", variant.json())
-  ```
+We use structured JSON logging with correlation IDs and consistent context:
+
+```python
+# Initialize logger
+logger = logging.getLogger(__name__)
+
+@with_correlation_id()
+@log_timing(logger)
+async def create_chat_completion(...):
+    try:
+        logger.debug("Creating chat completion", extra={
+            "session_id": session_id,
+            "variant_id": variant_id,
+            "message_count": len(messages)
+        })
+        
+        variant = await self.get_variant(session_id, variant_id)
+        
+        # Log full variant state at DEBUG level
+        logger.debug("Using variant configuration", extra={
+            "session_id": session_id,
+            "variant_id": variant_id,
+            "stream": stream,
+            "max_tokens": max_completion_tokens,
+            "temperature": temperature,
+            "top_p": top_p,
+            "variant_state": variant.json()
+        })
+        
+        # Operation success logging
+        logger.info("Chat completion successful", extra={
+            "session_id": session_id,
+            "variant_id": variant_id,
+            "content_length": len(content)
+        })
+        
+    except Exception as e:
+        # Error logging with full context
+        logger.error("Chat completion failed", exc_info=True, extra={
+            "session_id": session_id,
+            "variant_id": variant_id,
+            "error": str(e)
+        })
+        raise
+
+@with_correlation_id()
+@log_timing(logger)
+async def steer_feature(...):
+    try:
+        logger.info("Steering feature", extra={
+            "session_id": session_id,
+            "variant_id": variant_id,
+            "feature": feature_label,
+            "value": value
+        })
+        
+        # Debug level for detailed operations
+        logger.debug("Feature steering applied", extra={
+            "session_id": session_id,
+            "variant_id": variant_id,
+            "feature": feature_label,
+            "value": value
+        })
+        
+    except Exception as e:
+        logger.error("Feature steering failed", exc_info=True, extra={
+            "session_id": session_id,
+            "variant_id": variant_id,
+            "feature": feature_label,
+            "value": value,
+            "error": str(e)
+        })
+        raise
+```
+
+Our logging follows these principles:
+
+1. **Structured Format**
+   - All logs are JSON-formatted
+   - Include consistent context (session_id, variant_id)
+   - Use extra field for structured data
+
+2. **Correlation Tracking**
+   - Use `@with_correlation_id()` decorator
+   - Track request flow across components
+   - Include correlation ID in all logs
+
+3. **Performance Monitoring**
+   - Use `@log_timing` decorator
+   - Track duration of SDK operations
+   - Log performance metrics at DEBUG level
+
+4. **Log Levels**
+   - ERROR: SDK exceptions, critical failures
+   ```python
+   logger.error("Operation failed", exc_info=True, extra={
+       "correlation_id": get_correlation_id(),
+       "error": str(e)
+   })
+   ```
+   
+   - WARNING: SDK warnings, performance issues
+   ```python
+   logger.warning("Rate limit threshold reached", extra={
+       "requests_per_min": rate,
+       "correlation_id": get_correlation_id()
+   })
+   ```
+   
+   - INFO: Major operations, state changes
+   ```python
+   logger.info("Feature modification applied", extra={
+       "feature": feature_label,
+       "value": value,
+       "correlation_id": get_correlation_id()
+   })
+   ```
+   
+   - DEBUG: Detailed operation info
+   ```python
+   logger.debug("SDK operation details", extra={
+       "operation": "steer_feature",
+       "parameters": parameters,
+       "correlation_id": get_correlation_id()
+   })
+   ```
+   
+   - TRACE: Complete payload logging
+   ```python
+   logger.debug("Full variant state", extra={
+       "variant_json": variant.json(),
+       "correlation_id": get_correlation_id()
+   })
+   ```
+
+5. **Environment-Based Configuration**
+```python
+# Log levels by environment
+LOGGING_CONFIG = {
+    "production": "INFO",
+    "staging": "DEBUG",
+    "development": "TRACE"
+}
+```
 
 ### 3. SDK Error Handling
 - Use comprehensive try/except blocks
@@ -322,6 +448,126 @@ async def steer_feature(variant_id: str, feature_label: str, value: float):
 async def get_modified_features(variant_id: str):
     variant = load_variant(variant_id)
     return variant.json()
+```
+
+### /features/analyze-query Endpoint
+```python
+async def analyze_query(
+    query: str,
+    session_id: str,
+    variant_id: Optional[str] = None,
+    context: Optional[Dict[str, List[ChatMessage]]] = None
+) -> QueryAnalysisResponse:
+    """Analyze a user query to determine optimal persona and feature categories.
+    
+    Uses the SDK to:
+    1. Analyze query intent and required expertise
+    2. Determine optimal persona settings
+    3. Identify relevant feature categories and importance
+    """
+    variant = await self.get_variant(session_id, variant_id)
+    
+    # Use LLM to analyze query and determine optimal features
+    analysis_json = await self.llm_client.get_json_response(prompt)
+    
+    # Convert to structured response with persona and feature recommendations
+    response = QueryAnalysisResponse(
+        persona=PersonaAnalysis(...),
+        features=FeatureAnalysis(...)
+    )
+    
+    # Automatically apply recommended features
+    await self.auto_steer(
+        analysis=response,
+        session_id=session_id,
+        variant_id=variant_id
+    )
+    
+    return response
+```
+
+### /features/auto-steer Endpoint
+```python
+async def auto_steer(
+    analysis: QueryAnalysisResponse,
+    session_id: str,
+    variant_id: Optional[str] = None
+) -> List[SteerFeatureResponse]:
+    """Automatically apply feature steering based on query analysis.
+    
+    Uses the SDK to:
+    1. Convert importance scores to steering values
+    2. Search for matching features
+    3. Apply steering modifications
+    """
+    steered_features: List[SteerFeatureResponse] = []
+    
+    # Process all feature categories (style, reasoning, knowledge)
+    all_features = (
+        [("style", f) for f in analysis.features.style] +
+        [("reasoning", f) for f in analysis.features.reasoning] +
+        [("knowledge", f) for f in analysis.features.knowledge]
+    )
+    
+    for category, feature in all_features:
+        # Convert importance (1-4) to steering value (0.1-0.4)
+        steering_value = feature.importance / 10.0
+        
+        # Search for matching feature using SDK
+        search_results = await self.search_features(
+            query=feature.label,
+            session_id=session_id,
+            variant_id=variant_id,
+            top_k=1
+        )
+        
+        if search_results:
+            # Apply steering using SDK's variant.set()
+            steered = await self.steer_feature(
+                session_id=session_id,
+                variant_id=variant_id,
+                feature_label=search_results[0].label,
+                value=steering_value
+            )
+            steered_features.append(steered)
+    
+    return steered_features
+```
+
+### /features/cluster Endpoint
+```python
+async def cluster_features(
+    features: List[FeatureActivation],
+    session_id: str,
+    variant_id: Optional[str] = None,
+    num_categories: int = 5
+) -> List[FeatureCluster]:
+    """Cluster features into logical groups.
+    
+    Uses the SDK to:
+    1. Get feature embeddings and metadata
+    2. Group related features
+    3. Generate cluster descriptions
+    """
+    # Get the variant
+    variant = await self.get_variant(session_id, variant_id)
+    
+    # Use LLM to cluster features
+    clusters = await cluster_features(
+        llm_client=self.llm_client,
+        features=features,
+        num_categories=num_categories
+    )
+    
+    # Log clustering results
+    logger.info("Feature clustering completed", extra={
+        "session_id": session_id,
+        "variant_id": variant_id,
+        "cluster_count": len(clusters),
+        "total_features": sum(len(c.features) for c in clusters)
+    })
+    
+    return clusters
 ```
 
 ## Error Handling

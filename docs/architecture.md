@@ -80,12 +80,19 @@ Example:
 sequenceDiagram
     participant U as User
     participant CI as Chat.tsx
+    participant AQ as /features/analyze-query
+    participant AS as /features/auto-steer
     participant CC as /chat/completions
     participant FI as /features/inspect
     
     U->>CI: Send Message
-    CI->>CC: POST Request
-    CC-->>CI: Print Response
+    CI->>AQ: Analyze Query
+    AQ->>AS: Request Auto-Steering
+    AS->>AS: Calculate Steering Values
+    AS-->>AQ: Return Steering Values
+    AQ-->>CI: Return Steering Config
+    CI->>CC: POST Request with Steering
+    CC-->>CI: Return Optimized Response
     CI->>FI: POST Request
     FI-->>CI: Show Feature Activations
 ```
@@ -131,6 +138,7 @@ sequenceDiagram
     IP->>FS: Steer Feature (if adjusted)
 ```
 
+
 ## Future API Trigger Flows 🚧 TODO
 
 ### Streaming Message Flow
@@ -149,7 +157,6 @@ sequenceDiagram
     CI->>FI: POST Request
     FI-->>CI: Show Feature Activations
 ```
-
 ### TestBench Flow
 ```mermaid
 sequenceDiagram
@@ -164,7 +171,6 @@ sequenceDiagram
     TB->>TD: Store Results
     TD-->>TB: Confirmation
 ```
-
 ## Current Implementation Details ✓
 
 ### Frontend
@@ -200,3 +206,5 @@ sequenceDiagram
 - TestBench service
 - Analytics service
 - Advanced error handling
+
+

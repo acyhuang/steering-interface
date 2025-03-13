@@ -1,7 +1,7 @@
-import json
+from typing import Dict, Any, List, Optional
+from openai import AsyncOpenAI
 import logging
-from typing import Dict, List, Optional, Any
-from openai import OpenAI, AsyncOpenAI
+import json
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 
@@ -153,4 +153,53 @@ class LLMClient:
             logger.error(f"Traceback: {traceback.format_exc()}")
             # Return a fallback classification
             logger.warning(f"Using fallback classification for {len(features)} features")
-            return {"Other": features} 
+            return {"Other": features}
+
+    async def get_json_response(self, prompt: str) -> Dict[str, Any]:
+        """Get a JSON response from the LLM.
+        
+        Args:
+            prompt: The prompt to send to the LLM
+            
+        Returns:
+            Dict containing the parsed JSON response
+            
+        Raises:
+            ValueError: If the response cannot be parsed as JSON
+        """
+        try:
+            logger.debug("Sending prompt to LLM", extra={
+                "model": self.model,
+                "prompt_length": len(prompt)
+            })
+            
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that responds only in valid JSON format."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                response_format={"type": "json_object"}
+            )
+            
+            content = response.choices[0].message.content
+            
+            try:
+                result = json.loads(content)
+                logger.debug("Successfully parsed JSON response", extra={
+                    "response_length": len(content)
+                })
+                return result
+            except json.JSONDecodeError as e:
+                logger.error("Failed to parse JSON response", exc_info=True, extra={
+                    "content": content,
+                    "error": str(e)
+                })
+                raise ValueError(f"Failed to parse LLM response as JSON: {str(e)}")
+                
+        except Exception as e:
+            logger.error("Error getting LLM response", exc_info=True, extra={
+                "error": str(e)
+            })
+            raise 

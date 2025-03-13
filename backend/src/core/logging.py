@@ -44,15 +44,45 @@ class StructuredJsonFormatter(logging.Formatter):
             
         # Add extra fields if present
         if hasattr(record, 'extra'):
-            log_data.update(record.extra)
+            # Process each field in extra individually
+            for key, value in record.extra.items():
+                try:
+                    # Test if this field can be serialized
+                    json.dumps({key: value})
+                    log_data[key] = value
+                except (TypeError, ValueError) as e:
+                    # If serialization fails, try to convert to string
+                    try:
+                        if hasattr(value, 'dict'):
+                            # Handle Pydantic models
+                            log_data[key] = value.dict()
+                        elif hasattr(value, '__dict__'):
+                            # Handle other objects with __dict__
+                            log_data[key] = value.__dict__
+                        else:
+                            # Fall back to string representation
+                            log_data[key] = str(value)
+                    except Exception:
+                        log_data[f"{key}_error"] = f"Failed to serialize: {str(e)}"
             
         # Add exception info if present
         if record.exc_info:
             log_data['exception'] = self.formatException(record.exc_info)
             
         # Use indentation in development for readability
-        indent = 2 if self.use_indentation else None
-        return json.dumps(log_data, indent=indent)
+        try:
+            indent = 2 if self.use_indentation else None
+            return json.dumps(log_data, indent=indent)
+        except (TypeError, ValueError) as e:
+            # Fallback if JSON serialization fails
+            return json.dumps({
+                'timestamp': self.formatTime(record),
+                'level': 'ERROR',
+                'component': record.name,
+                'message': 'Failed to serialize log record',
+                'error': str(e),
+                'original_message': record.getMessage()
+            }, indent=indent)
 
 def setup_logging(env: str = None) -> None:
     """Configure application-wide logging.

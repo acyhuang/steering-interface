@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict
+from ..models.chat import ChatMessage
 
 class FeatureActivation(BaseModel):
     """Model representing an activated feature and its strength.
@@ -51,16 +52,14 @@ class ClearFeatureResponse(BaseModel):
 # New models for feature clustering
 
 class FeatureCluster(BaseModel):
-    """Model representing a cluster of features.
+    """Model for a cluster of features.
     
     Attributes:
         name: Name of the cluster
         features: List of features in the cluster
-        type: Type of cluster (predefined or dynamic)
     """
     name: str
     features: List[FeatureActivation]
-    type: Literal["predefined", "dynamic"]
 
 class ClusterFeaturesRequest(BaseModel):
     """Model for feature clustering requests.
@@ -82,4 +81,100 @@ class ClusteredFeaturesResponse(BaseModel):
     Attributes:
         clusters: List of feature clusters
     """
-    clusters: List[FeatureCluster] 
+    clusters: List[FeatureCluster]
+
+class PersonaAnalysis(BaseModel):
+    """Model for persona analysis results.
+    
+    Attributes:
+        role: The role the assistant should take (e.g., "writing coach")
+        style: Description of communication style
+        approach: Description of problem-solving approach
+    """
+    role: str
+    style: str
+    approach: str
+
+class FeatureImportance(BaseModel):
+    """Model for a feature with its importance score.
+    
+    Attributes:
+        label: Feature identifier
+        importance: Importance score (0-1)
+    """
+    label: str
+    importance: float
+
+class FeatureAnalysis(BaseModel):
+    """Model for feature analysis results.
+    
+    Attributes:
+        style: Writing style features
+        reasoning: Reasoning method features
+        knowledge: Knowledge domain features
+    """
+    style: List[FeatureImportance]
+    reasoning: List[FeatureImportance]
+    knowledge: List[FeatureImportance]
+
+class QueryAnalysisRequest(BaseModel):
+    """Model for query analysis requests.
+    
+    Attributes:
+        query: User's query
+        session_id: Session ID
+        variant_id: Optional variant ID
+        context: Optional conversation context
+    """
+    query: str
+    session_id: str
+    variant_id: Optional[str] = None
+    context: Optional[Dict[str, List[ChatMessage]]] = None
+
+class QueryAnalysisResponse(BaseModel):
+    """Model for query analysis responses.
+    
+    Attributes:
+        persona: Persona analysis results
+        features: Feature analysis results
+    """
+    persona: PersonaAnalysis
+    features: FeatureAnalysis
+
+class AppliedFeature(BaseModel):
+    """Model for an applied feature modification.
+    
+    Attributes:
+        label: Feature identifier
+        value: Applied steering value
+        category: Feature category
+    """
+    label: str
+    value: float
+    category: str
+
+class AutoSteerRequest(BaseModel):
+    """Model for auto-steering requests.
+    
+    Attributes:
+        analysis: Output from analyze-query
+        session_id: Session ID
+        variant_id: Optional variant ID
+        max_features: Optional maximum features to steer per category
+    """
+    analysis: QueryAnalysisResponse
+    session_id: str
+    variant_id: Optional[str] = None
+    max_features: Optional[int] = 5
+
+class AutoSteerResponse(BaseModel):
+    """Model for auto-steering responses.
+    
+    Attributes:
+        applied_features: List of applied feature modifications
+        variant_id: ID of modified variant
+        variant_json: Complete variant configuration
+    """
+    applied_features: List[AppliedFeature]
+    variant_id: str
+    variant_json: str 

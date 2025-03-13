@@ -207,6 +207,104 @@ Searches for features based on semantic similarity to a query string.
 ]
 ```
 
+#### Analyze Query 
+```http
+POST /features/analyze-query
+```
+
+Analyzes a user query to determine optimal persona and feature categories.
+
+**Request Body:**
+```json
+{
+  "query": "string",           // User's query
+  "session_id": "string",
+  "variant_id": "string",      // optional
+  "context": {                 // optional
+    "previous_messages": [     // Previous conversation context
+      {
+        "role": "user|assistant",
+        "content": "string"
+      }
+    ]
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "persona": {
+    "role": "string",          // e.g., "writing coach", "technical expert"
+    "style": "string",         // Communication style description
+    "approach": "string"       // Problem-solving approach
+  },
+  "features": {
+    "style": [                 // Writing style features
+      {
+        "label": "string",     // Feature identifier
+        "importance": 0.8      // Importance score (0-1)
+      }
+    ],
+    "reasoning": [             // Reasoning method features
+      {
+        "label": "string",
+        "importance": 0.8
+      }
+    ],
+    "knowledge": [             // Knowledge domain features
+      {
+        "label": "string",
+        "importance": 0.8
+      }
+    ]
+  }
+}
+```
+
+#### Auto-Steer
+```http
+POST /features/auto-steer
+```
+
+Automatically applies feature steering based on query analysis.
+
+**Request Body:**
+```json
+{
+  "analysis": {              // Output from analyze-query
+    "persona": {
+      "role": "string",
+      "style": "string",
+      "approach": "string"
+    },
+    "features": {
+      "style": [],
+      "reasoning": [],
+      "knowledge": []
+    }
+  },
+  "session_id": "string",
+  "variant_id": "string",    // optional
+  "max_features": 5          // optional, max features to steer per category
+}
+```
+
+**Response:**
+```json
+{
+  "applied_features": [
+    {
+      "label": "string",     // Feature identifier
+      "value": 0.5,         // Applied steering value
+      "category": "string"   // Feature category
+    }
+  ],
+  "variant_id": "string",    // ID of modified variant
+  "variant_json": "string"   // Complete variant configuration
+}
+```
+
 ### Future Endpoints 🚧 TODO
 
 #### Configuration Management

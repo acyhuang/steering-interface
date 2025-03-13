@@ -129,11 +129,11 @@ export function Chat({ onMessagesUpdate, onVariantChange }: ChatProps) {
       <div className="p-2 border-b bg-muted/50">
         <div className="text-sm text-muted-foreground space-y-1">
           <div>Current Variant: <span className="font-medium">{currentVariant}</span></div>
-          {/* {variantJson && (
+          {variantJson && (
             <div className="text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-32">
               {variantJson}
             </div>
-          )} */}
+          )}
         </div>
       </div>
       <ScrollArea className="flex-1 p-4">

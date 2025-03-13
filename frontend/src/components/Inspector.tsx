@@ -297,9 +297,9 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
           value={selectedTab}
           onValueChange={setSelectedTab}
         >
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="activated">Activated</TabsTrigger>
-            <TabsTrigger value="suggested">Suggested</TabsTrigger>
+            {/* <TabsTrigger value="suggested">Suggested</TabsTrigger> */}
             <TabsTrigger value="modified">Modified</TabsTrigger>
           </TabsList>
 
@@ -309,11 +309,11 @@ export function Inspector({ features, isLoading, variantId = "default" }: Inspec
                 {renderActivatedFeatures()}
               </TabsContent>
 
-              <TabsContent value="suggested" className="m-0">
+              {/* <TabsContent value="suggested" className="m-0">
                 <div className="text-sm text-gray-500">
                   No suggested features available yet.
                 </div>
-              </TabsContent>
+              </TabsContent> */}
 
               <TabsContent value="modified" className="m-0">
                 {isLoadingModified ? (

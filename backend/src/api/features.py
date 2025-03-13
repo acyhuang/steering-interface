@@ -10,7 +10,11 @@ from ..models.features import (
     ClearFeatureResponse,
     FeatureCluster,
     ClusterFeaturesRequest,
-    ClusteredFeaturesResponse
+    ClusteredFeaturesResponse,
+    QueryAnalysisRequest,
+    QueryAnalysisResponse,
+    AutoSteerRequest,
+    AutoSteerResponse
 )
 from ..core.services import EmberService
 from ..core.dependencies import get_ember_service
@@ -147,4 +151,50 @@ async def cluster_features(
         return ClusteredFeaturesResponse(clusters=clusters)
     except Exception as e:
         logger.error(f"Error clustering features: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/analyze-query", response_model=QueryAnalysisResponse)
+async def analyze_query(
+    request: QueryAnalysisRequest,
+    ember_service: EmberService = Depends(get_ember_service)
+) -> QueryAnalysisResponse:
+    """Analyze a user query to determine optimal persona and feature categories."""
+    logger.info(f"Received query analysis request for session {request.session_id}")
+    
+    try:
+        analysis = await ember_service.analyze_query(
+            query=request.query,
+            session_id=request.session_id,
+            variant_id=request.variant_id,
+            context=request.context
+        )
+        
+        logger.info(f"Successfully analyzed query")
+        return analysis
+        
+    except Exception as e:
+        logger.error(f"Error during query analysis: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/auto-steer", response_model=AutoSteerResponse)
+async def auto_steer(
+    request: AutoSteerRequest,
+    ember_service: EmberService = Depends(get_ember_service)
+) -> AutoSteerResponse:
+    """Automatically apply feature steering based on query analysis."""
+    logger.info(f"Received auto-steer request for session {request.session_id}")
+    
+    try:
+        result = await ember_service.auto_steer(
+            analysis=request.analysis,
+            session_id=request.session_id,
+            variant_id=request.variant_id,
+            max_features=request.max_features
+        )
+        
+        logger.info(f"Successfully applied auto-steering")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error during auto-steering: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 
