@@ -45,7 +45,6 @@ export function Controls({ features, isLoading, variantId = "default" }: Control
   const [selectedTab, setSelectedTab] = useState("activated")
   const [searchResults, setSearchResults] = useState<FeatureActivation[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [showSearchResults, setShowSearchResults] = useState(false)
   const [clusters, setClusters] = useState<FeatureCluster[]>([])
   const [isClusteringLoading, setIsClusteringLoading] = useState(false)
   
@@ -181,7 +180,6 @@ export function Controls({ features, isLoading, variantId = "default" }: Control
     if (!searchQuery.trim()) return;
     
     setIsSearching(true);
-    setShowSearchResults(true);
     
     try {
       logger.debug("Searching for features with query", { query: searchQuery });
@@ -200,10 +198,6 @@ export function Controls({ features, isLoading, variantId = "default" }: Control
     } finally {
       setIsSearching(false);
     }
-  }
-
-  const closeSearchResults = () => {
-    setShowSearchResults(false);
   }
 
   const renderActivatedFeatures = () => {
@@ -229,67 +223,61 @@ export function Controls({ features, isLoading, variantId = "default" }: Control
     );
   };
 
+  const renderSearchContent = () => {
+    return (
+      <div className="flex flex-col gap-4 pr-2">
+        {isSearching ? (
+          <div className="text-sm text-gray-500">Searching...</div>
+        ) : searchResults.length > 0 ? (
+          <div className="space-y-2">
+            {searchResults.map((feature, index) => (
+              <FeatureCardVariant
+                key={index}
+                feature={feature}
+                onSteer={handleSteer}
+                variantId={variantId}
+              />
+            ))}
+          </div>
+        ) : searchQuery ? (
+          <div className="text-sm text-gray-500">
+            Press Enter or click Search to find features
+          </div>
+        ) : (
+          <div className="text-sm text-gray-500">
+            Use semantic search to find features by their purpose or behavior
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderSearchBar = () => {
+    return (
+      <div className="flex gap-2 px-1 pt-1 pb-3 sticky top-0 bg-white border-b z-10">
+        <Input
+          placeholder="Search features..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleSearch()
+            }
+          }}
+        />
+        <Button onClick={handleSearch} type="submit">
+          <Search className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+  };
+
   return (
     <Card className="h-full p-4">
       <div className="flex flex-col h-full gap-4">
         <div className="flex flex-col gap-2">
           <h2 className="text-lg font-semibold">Steering Controls</h2>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Search features..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearch()
-                }
-              }}
-            />
-            <Button onClick={handleSearch} type="submit">
-              <Search className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
-
-        {showSearchResults && (
-          <div className="relative">
-            <Card className="absolute z-10 w-full shadow-lg flex flex-col" 
-                  style={{ 
-                    maxHeight: 'calc(100vh - 200px)', 
-                    height: 'min(600px, 70vh)' 
-                  }}>
-              <div className="flex justify-between items-center p-4 border-b">
-                <h3 className="font-medium">Search Results</h3>
-                <Button variant="ghost" size="sm" onClick={closeSearchResults}>
-                  ✕
-                </Button>
-              </div>
-              
-              <div className="flex-1 overflow-hidden">
-                {isSearching ? (
-                  <div className="text-sm text-gray-500 p-4">Searching...</div>
-                ) : searchResults.length > 0 ? (
-                  <ScrollArea className="h-full">
-                    <div className="space-y-2 p-4">
-                      {searchResults.map((feature, index) => (
-                        <FeatureCardVariant
-                          key={index}
-                          feature={feature}
-                          onSteer={handleSteer}
-                          variantId={variantId}
-                        />
-                      ))}
-                    </div>
-                  </ScrollArea>
-                ) : (
-                  <div className="text-sm text-gray-500 p-4">
-                    No features found for "{searchQuery}"
-                  </div>
-                )}
-              </div>
-            </Card>
-          </div>
-        )}
 
         <Tabs 
           defaultValue="activated" 
@@ -297,10 +285,10 @@ export function Controls({ features, isLoading, variantId = "default" }: Control
           value={selectedTab}
           onValueChange={setSelectedTab}
         >
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="activated">Activated</TabsTrigger>
-            {/* <TabsTrigger value="suggested">Suggested</TabsTrigger> */}
             <TabsTrigger value="modified">Modified</TabsTrigger>
+            <TabsTrigger value="search">Search</TabsTrigger>
           </TabsList>
 
           <div className="flex-1 min-h-0 mt-4">
@@ -308,12 +296,6 @@ export function Controls({ features, isLoading, variantId = "default" }: Control
               <TabsContent value="activated" className="m-0">
                 {renderActivatedFeatures()}
               </TabsContent>
-
-              {/* <TabsContent value="suggested" className="m-0">
-                <div className="text-sm text-gray-500">
-                  No suggested features available yet.
-                </div>
-              </TabsContent> */}
 
               <TabsContent value="modified" className="m-0">
                 {isLoadingModified ? (
@@ -334,6 +316,13 @@ export function Controls({ features, isLoading, variantId = "default" }: Control
                     No modified features available.
                   </div>
                 )}
+              </TabsContent>
+
+              <TabsContent value="search" className="m-0">
+                {renderSearchBar()}
+                <div className="px-1 pt-2">
+                  {renderSearchContent()}
+                </div>
               </TabsContent>
             </ScrollArea>
           </div>

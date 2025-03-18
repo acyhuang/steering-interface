@@ -17,7 +17,8 @@ function App() {
   // Store split sizes in localStorage to persist user preference
   const [sizes, setSizes] = useState(() => {
     const saved = localStorage.getItem('split-sizes')
-    return saved ? JSON.parse(saved) : [75, 25] // default split: 75% chat, 25% controls
+    const parsed = saved ? JSON.parse(saved) as number[] : null
+    return Array.isArray(parsed) ? parsed : [75, 25] // default split: 75% chat, 25% controls
   })
 
   const [features, setFeatures] = useState<FeatureActivation[]>([])
