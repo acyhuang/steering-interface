@@ -16,7 +16,7 @@ import { useFeatureCardVariant } from './feature-card'
 import { useFeatureListVariant } from './feature-list'
 import { useLogger } from '@/lib/logger'
 
-interface InspectorProps {
+interface ControlsProps {
   features?: FeatureActivation[];
   isLoading?: boolean;
   variantId?: string;
@@ -35,7 +35,7 @@ interface VariantResponse {
   scopes: any[];
 }
 
-export function Controls({ features, isLoading, variantId = "default" }: InspectorProps) {
+export function Controls({ features, isLoading, variantId = "default" }: ControlsProps) {
   const logger = useLogger('Controls')
   const [searchQuery, setSearchQuery] = useState("")
   const [localFeatures, setLocalFeatures] = useState(features || [])
@@ -54,9 +54,9 @@ export function Controls({ features, isLoading, variantId = "default" }: Inspect
 
   // Log initial mount
   useEffect(() => {
-    logger.debug('Inspector component mounted');
+    logger.debug('Controls component mounted');
     return () => {
-      logger.debug('Inspector component unmounted');
+      logger.debug('Controls component unmounted');
     };
   }, [logger]);
 

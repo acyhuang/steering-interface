@@ -1,6 +1,6 @@
 import { Chat } from "@/components/Chat"
 import { ConnectionStatus } from "@/components/ConnectionStatus"
-import { Inspector } from "@/components/Inspector"
+import { Controls } from "@/components/Controls"
 import Split from 'react-split'
 import { useEffect, useState } from "react"
 import { FeatureActivation } from "./types/features"
@@ -17,7 +17,7 @@ function App() {
   // Store split sizes in localStorage to persist user preference
   const [sizes, setSizes] = useState(() => {
     const saved = localStorage.getItem('split-sizes')
-    return saved ? JSON.parse(saved) : [75, 25] // default split: 75% chat, 25% inspector
+    return saved ? JSON.parse(saved) : [75, 25] // default split: 75% chat, 25% controls
   })
 
   const [features, setFeatures] = useState<FeatureActivation[]>([])
@@ -75,14 +75,13 @@ function App() {
             <div className="h-full">
               <Chat 
                 onMessagesUpdate={handleMessagesUpdate}
-                onTestChange={handleTestChange}
               />
             </div>
             <div className="h-full">
-              <Inspector 
+              <Controls 
                 features={features} 
                 isLoading={isLoadingFeatures}
-                testId={currentTestId}
+                variantId={currentTestId}
               />
             </div>
           </Split>

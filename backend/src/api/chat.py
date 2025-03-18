@@ -36,46 +36,46 @@ async def create_chat_completion(
         # For now, use a simple session ID. Later we'll implement proper session management
         session_id = "default_session"  # TODO: Implement proper session management
         
-        # First, analyze the query to determine optimal persona and features
-        last_message = request.messages[-1] if request.messages else None
-        logger.info("[TRACE] About to check if should run analyze_query", extra={
-            "has_last_message": bool(last_message),
-            "message_role": last_message.role if last_message else None
-        })
-        if last_message and last_message.role == "user":
-            try:
-                logger.info("[TRACE] Starting analyze_query call", extra={
-                    "query": last_message.content,
-                    "session_id": session_id,
-                    "context_length": len(request.messages[:-1]) if len(request.messages) > 1 else 0
-                })
-                analysis = await ember_service.analyze_query(
-                    query=last_message.content,
-                    session_id=session_id,
-                    context={"messages": request.messages[:-1]} if len(request.messages) > 1 else None
-                )
-                print("[DEBUG] Got analysis response:", analysis)  # Debug print
-                print("[DEBUG] Analysis dict:", analysis.dict())  # Debug print
-                logger.info("Query analysis results:", extra={
-                    "persona": {
-                        "role": analysis.persona.role,
-                        "style": analysis.persona.style,
-                        "approach": analysis.persona.approach
-                    },
-                    "feature_counts": {
-                        "style": len(analysis.features.style),
-                        "reasoning": len(analysis.features.reasoning),
-                        "knowledge": len(analysis.features.knowledge)
-                    },
-                    "features": {
-                        "style": [{"label": f.label, "importance": f.importance} for f in analysis.features.style],
-                        "reasoning": [{"label": f.label, "importance": f.importance} for f in analysis.features.reasoning],
-                        "knowledge": [{"label": f.label, "importance": f.importance} for f in analysis.features.knowledge]
-                    }
-                })
-            except Exception as e:
-                logger.error("Error during query analysis:", exc_info=True)
-                # Continue with chat completion even if analysis fails
+        # # First, analyze the query to determine optimal persona and features
+        # last_message = request.messages[-1] if request.messages else None
+        # logger.info("[TRACE] About to check if should run analyze_query", extra={
+        #     "has_last_message": bool(last_message),
+        #     "message_role": last_message.role if last_message else None
+        # })
+        # if last_message and last_message.role == "user":
+        #     try:
+        #         logger.info("[TRACE] Starting analyze_query call", extra={
+        #             "query": last_message.content,
+        #             "session_id": session_id,
+        #             "context_length": len(request.messages[:-1]) if len(request.messages) > 1 else 0
+        #         })
+        #         analysis = await ember_service.analyze_query(
+        #             query=last_message.content,
+        #             session_id=session_id,
+        #             context={"messages": request.messages[:-1]} if len(request.messages) > 1 else None
+        #         )
+        #         print("[DEBUG] Got analysis response:", analysis)  # Debug print
+        #         print("[DEBUG] Analysis dict:", analysis.dict())  # Debug print
+        #         logger.info("Query analysis results:", extra={
+        #             "persona": {
+        #                 "role": analysis.persona.role,
+        #                 "style": analysis.persona.style,
+        #                 "approach": analysis.persona.approach
+        #             },
+        #             "feature_counts": {
+        #                 "style": len(analysis.features.style),
+        #                 "reasoning": len(analysis.features.reasoning),
+        #                 "knowledge": len(analysis.features.knowledge)
+        #             },
+        #             "features": {
+        #                 "style": [{"label": f.label, "importance": f.importance} for f in analysis.features.style],
+        #                 "reasoning": [{"label": f.label, "importance": f.importance} for f in analysis.features.reasoning],
+        #                 "knowledge": [{"label": f.label, "importance": f.importance} for f in analysis.features.knowledge]
+        #             }
+        #         })
+        #     except Exception as e:
+        #         logger.error("Error during query analysis:", exc_info=True)
+        #         # Continue with chat completion even if analysis fails
         
         response = await ember_service.create_chat_completion(
             messages=request.messages,
