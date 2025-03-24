@@ -189,6 +189,93 @@ sequenceDiagram
 - Synchronous completions
 - Basic error handling
 
+## Testing Architecture ✓
+
+### Directory Structure
+```
+frontend/
+├── test/                    # Global test configuration
+│   ├── setup/              # Test setup files
+│   ├── helpers/            # Test utilities
+│   └── fixtures/           # Test data
+├── src/
+    ├── components/         # UI Components
+    │   └── ComponentName/
+    │       └── __tests__/  # Component-specific tests
+    └── contexts/           # Business Logic
+        └── __tests__/      # Context/state tests
+```
+
+### Component Tests
+Located in `src/components/*/`:
+- Focus on UI behavior and rendering
+- Test component-specific functionality
+- Verify:
+  - Rendering with different props
+  - User interactions
+  - Visual states (loading, error, empty)
+  - Props handling
+  - UI library integration
+
+Example structure:
+```typescript
+describe('ComponentName', () => {
+  describe('Rendering', () => {
+    // Basic rendering tests
+  });
+  
+  describe('Interactions', () => {
+    // User interaction tests
+  });
+  
+  describe('State Management', () => {
+    // Component state tests
+  });
+});
+```
+
+### Context Tests
+Located in `src/contexts/__tests__/`:
+- Focus on business logic and state management
+- Test application behavior layer
+- Verify:
+  - State transitions
+  - Business logic implementation
+  - Data flow
+  - API/Service integration
+  - Error handling
+
+Example structure:
+```typescript
+describe('ContextName', () => {
+  describe('State Management', () => {
+    // State transition tests
+  });
+  
+  describe('Business Logic', () => {
+    // Core functionality tests
+  });
+  
+  describe('Error Handling', () => {
+    // Error case tests
+  });
+});
+```
+
+### Test Configuration
+- Uses Vitest as test runner
+- React Testing Library for component testing
+- Global test setup in `test/setup/setup.ts`
+- Shared test utilities in `test/helpers/`
+- Coverage reporting configured
+- Available commands:
+  ```bash
+  npm test           # Run all tests
+  npm run test:watch # Watch mode
+  npm run test:coverage # Generate coverage
+  npm run test:ui    # UI test runner
+  ```
+
 ## Future Enhancements 🚧 TODO
 
 ### Frontend
