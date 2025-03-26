@@ -15,39 +15,35 @@ This feature allows users to compare the effects of different steering actions o
 ### Core Behaviors
 1. Comparison Display
    - Only two outputs shown side-by-side at any time
+   - Text above the split view shows "Which response do you prefer?"
    - Left side always shows "original" response (confirmed steers if any)
    - Right side shows "new" response with current parameters (pending steers)
+   - User can click on the response they prefer which triggers confirmation/cancellation flow
 
 2. Response Management
-   - Original response must be stored for one conversation turn
+   - If the original response has already been generated, we should use that response for the comparison (don't generate a new response)
    - Only the text content of responses is compared
    - Responses are displayed using the existing rendering system
 
-3. Steering Flow
+3. Steering Flow and Multiple Features
    - Each new steering action compares against the original response
+   - Users can adjust multiple steering features before confirming (i.e. multiple features can be pending at once)
    - Two-step confirmation process:
      a. User adjusts steering parameters to see comparison
      b. User explicitly confirms desired output
-   - Upon confirmation, pending steers are confirmed and applied for future messages
-   - Upon cancellation, all pending steering changes are reverted to the last confirmed state
-
-4. Turn Management
-   - A turn is defined by a user message and its corresponding model response
-   - TurnId changes only when the user sends a new message
-   - Users can only steer the current (most recent) message
-   - Previous messages in the conversation cannot be steered
-
-5. Multiple Feature Steering
-   - Users can adjust multiple steering features before confirming (i.e. multiple features can be pending at once)
    - The "original" response shown in comparison is the last confirmed state
    - Each steering action is tracked with a status:
      - PENDING: Feature has been adjusted but not confirmed
      - CONFIRMED: Feature adjustment has been accepted
    - When generating a steered response, all PENDING features are applied together
-   - After confirmation, all PENDING features become CONFIRMED
-   - After rejection, all PENDING features are cleared
+   - Upon confirmation:
+     - All pending steers are confirmed and applied for future messages
+     - All PENDING features become CONFIRMED
+   - Upon cancellation:
+     - All pending steering changes are reverted to the last confirmed state
+     - All PENDING features are cleared
 
-6. State Management
+4. State Management
    - Variant state is managed using the SDK's built-in Variant class
    - A single primary variant instance is maintained per session
    - Pending changes are tracked separately from confirmed changes
@@ -78,38 +74,6 @@ This feature allows users to compare the effects of different steering actions o
      - User can retry generation or cancel changes
      - Error state is displayed in comparison view
 
-### Frontend Requirements
-1. Components
-   - Split-view comparison container
-   - Steering control panel
-   - Confirmation/cancel buttons for steering choices
-   - Visual indicator for original vs. steered content
-
-2. State Management
-   - Track original response for current turn
-   - Track current steering parameters
-   - Track comparison state (viewing/confirming)
-
-### Backend Requirements
-1. API Endpoints
-   We'll utilize these existing endpoints from our API:
-   - `/chat/completions`: Generate both original and steered responses
-   - `/features/steer`: Apply steering parameters to the variant
-   
-   No new endpoints are required as:
-   - Original response storage is handled in frontend state
-   - Steering confirmation is implicit when keeping the steered variant state
-   - Cancellation is handled by frontend state management
-
-2. Data Models
-   The existing variant state model contains all necessary data:
-   - Variant configuration (from `/features/steer` responses)
-   - Steering parameters (tracked in variant state)
-   - Chat completion responses (from `/chat/completions`)
-
-3. State Management
-   - All temporary state (original response, comparison state) is managed in the frontend
-   - Persistent state (variant configuration) is managed through existing variant storage
 
 ### API Trigger Flow
 ```mermaid
@@ -145,152 +109,218 @@ sequenceDiagram
     end
 ```
 
+## Technical Specification
+
+### Component Structure
+
+#### 1. Enhanced ComparisonContext
+Leveraging the existing ComparisonContext to manage variant state transitions:
+
+```typescript
+interface ComparisonState {
+  originalResponse: ResponseState | null;
+  steeredResponse: ResponseState | null;
+  isComparing: boolean;
+  isLoading: boolean;
+  error: string | null;
+}
+
+interface ResponseState {
+  content: string;
+  timestamp: number;
+  variantState: string;
+}
+
+interface PendingFeature {
+  featureId: string;
+  featureLabel: string;
+  value: number;
+  status: 'PENDING' | 'CONFIRMED';
+  timestamp: number;
+}
+
+interface PendingFeaturesState {
+  features: Map<string, PendingFeature>;
+  lastConfirmedVariantState: string;
+}
+```
+
+#### 2. Chat Component Enhancement
+Update existing Chat component to:
+1. Subscribe to ComparisonContext
+2. Toggle between standard and comparison view
+3. Handle response selection
+
+```typescript
+interface ChatProps {
+  messages: ChatMessage[];
+  onSendMessage: (message: string) => void;
+  isLoading: boolean;
+  // New props for comparison
+  originalResponse?: string | null;
+  steeredResponse?: string | null;
+  isComparing: boolean;
+  onSelectOriginal: () => void;
+  onSelectSteered: () => void;
+}
+```
+
+#### 3. FeatureControl Component Enhancement
+Extend FeatureControl to dispatch steering actions to ComparisonContext:
+
+```typescript
+interface FeatureControlProps {
+  feature: FeatureActivation;
+  // New props
+  isPending: boolean;
+  onSteer: (feature: string, value: number) => void;
+}
+```
+
+### API Methods
+
+#### ComparisonService Interface
+Create a minimal service for comparison operations using existing API endpoints:
+
+```typescript
+interface ComparisonService {
+  generateComparison(
+    messages: ChatMessage[],
+    pendingFeatures: PendingFeature[],
+    variantId?: string
+  ): Promise<{
+    original: string;
+    steered: string;
+    originalState: string;
+    steeredState: string;
+  }>;
+  
+  applyPendingFeatures(
+    features: PendingFeature[],
+    variantId?: string
+  ): Promise<void>;
+  
+  confirmComparison(
+    variantId?: string
+  ): Promise<void>;
+  
+  rejectComparison(
+    variantId?: string
+  ): Promise<void>;
+}
+```
+
+#### ComparisonService Implementation
+Implement using existing API endpoints:
+
+```typescript
+class ComparisonServiceImpl implements ComparisonService {
+  // Uses existing /features/steer endpoint for pending features
+  // Uses existing /chat/completions endpoint for generating responses
+  // Uses existing /features/modified endpoint for variant state management
+}
+```
+
+### Variant Management
+
+#### VariantManager Interface
+Create a lightweight interface for variant operations:
+
+```typescript
+interface VariantManager {
+  applyPendingChanges(features: PendingFeature[]): void;
+  confirmPendingChanges(): void;
+  revertToConfirmed(): void;
+  getCurrentState(): string;
+  getLastConfirmedState(): string;
+}
+```
+
+#### Implementation Approach
+1. Use the existing ComparisonContext to track pending vs confirmed features
+2. Use the existing SplitView component to display comparison UI
+3. Enhance feature controls to indicate pending vs confirmed state
+4. Add handlers in Chat component to manage user selection
+
+### Event Flow
+
+1. **Feature Adjustment**:
+   - User adjusts feature in UI
+   - `ComparisonContext.addPendingFeature()` is called
+   - Feature is marked as PENDING in state
+   - If comparison already active, cancel current generation
+   - Generate new steered response with all pending features
+
+2. **Comparison Generation**:
+   - If originalResponse exists, use it
+   - Otherwise, generate using last confirmed variant state
+   - Generate steered response with all pending features applied
+   - Display both responses in SplitView component
+
+3. **User Selection**:
+   - User clicks on preferred response
+   - If original selected: `ComparisonContext.rejectComparison()`
+   - If steered selected: `ComparisonContext.confirmComparison()`
+   - ComparisonContext updates variant state accordingly
+   - UI exits comparison mode
+
+### Integration Points
+
+1. **Chat.tsx**: Display SplitView component when isComparing=true
+2. **Controls.tsx**: Update to show pending vs confirmed feature status
+3. **DiscreteFeatureCard.tsx**: Trigger comparison on adjustment
+4. **API Integration**: Use existing endpoints with enhanced client-side state management
+
 ## Implementation Plan
 
-### Phase 1: Basic Turn Management & Response Storage
-1. Add TurnId Management
-   - Implement turnId generation on new messages
-   - Add currentTurnId tracking to chat state
-   - Add tests for turn transitions
+### 1. State Management Updates
+1.1. Update ComparisonContext.tsx
+   - Remove turnId from ComparisonState interface
+   - Update reducers to handle simplified state transitions
+   - Add isLoading and error fields to state
 
-2. Implement Response Storage
-   - Add ComparisonState interface and basic state management
-   - Implement originalResponse storage logic
-   - Add cleanup handlers for turn changes
-   - Add tests for response storage lifecycle
+1.2. Implement VariantManager interface
+   - Create implementation class for variant operations
+   - Connect to existing variant state management
+   - Add methods for applying, confirming, and reverting changes
 
-### Phase 2: Single Feature Steering
-1. Add Steering State Management
-   - Implement PENDING/CONFIRMED feature status tracking
-   - Add state updates for single feature adjustment
-   - Add tests for feature state transitions
+### 2. Core Service Implementation
+2.1. Create ComparisonService interface & implementation
+   - Implement generateComparison method using existing API endpoints
+   - Implement applyPendingFeatures method
+   - Implement confirmComparison and rejectComparison methods
 
-2. Implement Basic Comparison UI
-   - Create side-by-side comparison component
-   - Add basic steering controls for single feature
-   - Add confirmation/cancel buttons
-   - Add tests for UI interactions
+### 3. Chat Component Integration
+3.1. Enhance Chat.tsx
+   - Add conditional rendering for SplitView
+   - Connect ComparisonContext actions
+   - Add handlers for selection actions
 
-3. Connect to API
-   - Integrate with `/chat/completions` for steered response
-   - Integrate with `/features/steer` for variant updates
-   - Add tests for API integration
+3.2. Update message rendering
+   - Ensure message components work with comparison view
 
-### Phase 3: Multiple Feature Steering
-1. Extend State Management
-   - Update state handling for multiple PENDING features
-   - Implement combined feature application logic
-   - Add tests for multiple feature state management
+### 4. API Integration
+4.1. Connect ComparisonService to backend
+   - Integrate with existing API endpoints
+   - Implement error handling
 
-2. Enhance UI
-   - Update comparison view to show multiple feature changes
-   - Extend steering controls to handle multiple features
-   - Add tests for multiple feature UI handling
+4.2. Implement cancellation logic
+   - Add support for cancelling in-flight requests
+   - Handle race conditions in comparison flow
 
-3. Update API Integration
-   - Modify API calls to handle multiple feature parameters
-   - Add tests for multiple feature API integration
+### 5. Final Integration & Polish
+5.1. Connect all components end-to-end
+   - Ensure ComparisonContext is properly provided
+   - Wire up all event handlers
 
-### Phase 4: Final Integration & Polish
-1. Error Handling
-   - Add error states for API failures
-   - Implement graceful fallbacks
-   - Add error case tests
+5.2. Add loading & error states
+   - Implement UX for generation in progress
+   - Add error recovery flow
 
-2. State Cleanup
-   - Implement comprehensive cleanup on turn changes
-   - Add cleanup for cancelled steering
-   - Add tests for cleanup scenarios
+5.3. Final styling and UX improvements
+   - Polish transitions between states
+   - Ensure mobile responsiveness
 
-3. Final Integration Testing
-   - End-to-end testing of complete workflows
-   - Performance testing for state management
-   - Cross-browser testing for UI components
 
-## Implementation Details
 
-### Response Storage
-1. Frontend State Management
-   ```typescript
-   interface ComparisonState {
-     originalResponse: {
-       content: string;
-       turnId: string;
-       timestamp: number;
-     } | null;
-     isComparing: boolean;
-     currentTurnId: string;
-     pendingFeatures: {
-       featureId: string;
-       parameters: SteeringParameters;
-       status: 'PENDING' | 'CONFIRMED';
-     }[];
-   }
-   ```
 
-2. Lifecycle Management
-   - Original response is stored when:
-     - User receives initial response
-     - Before applying first steering action in a turn
-   - Storage is cleared when:
-     - User confirms a steering choice (parameters become new defaults)
-     - User sends a new message (new turn)
-     - User cancels steering (reverts to last confirmed state)
-     - Turn ID changes
-
-3. Memory Considerations
-   - Only one original response stored at a time
-   - Automatic cleanup on turn changes
-   - No persistence needed between page reloads
-
-### Dependencies
-- State management library (e.g., React Context or Redux)
-- Unique ID generator for turn tracking
-
-### Architecture Changes
-- Add ComparisonState to frontend state management
-- Add turn tracking to chat interface
-- Add cleanup handlers for state management
-
-### State Management
-1. Frontend State Management
-   ```typescript
-   interface SteeringState {
-     variant: Variant;                    // SDK Variant instance
-     pendingFeatures: Map<string, number>;  // Tracks pending feature modifications
-     lastConfirmedState: string;          // JSON string of last confirmed variant
-     isComparing: boolean;
-     currentTurnId: string;
-   }
-   ```
-
-2. State Transitions
-   ```typescript
-   // Apply pending change
-   function applyPendingChange(feature: string, value: number) {
-     pendingFeatures.set(feature, value);
-     variant.set(feature, value);
-   }
-
-   // Confirm changes
-   function confirmChanges() {
-     pendingFeatures.clear();
-     lastConfirmedState = variant.json();
-   }
-
-   // Cancel changes
-   function cancelChanges() {
-     variant = Variant.from_json(lastConfirmedState);
-     pendingFeatures.clear();
-   }
-   ```
-
-3. Lifecycle Management
-   - Original response is stored when:
-     - User receives initial response
-     - Before applying first steering action in a turn
-   - Storage is cleared when:
-     - User confirms a steering choice (parameters become new defaults)
-     - User sends a new message (new turn)
-     - User cancels steering (reverts to last confirmed state)
-     - Turn ID changes
