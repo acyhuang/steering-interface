@@ -1,81 +1,27 @@
 # Architecture Overview
 
-## Implementation Status
+Features marked with [TODO] are planned for future implementation.
 
-This document outlines both currently implemented architecture components and planned future enhancements. Features marked with 🚧 TODO are planned for future implementation.
+## System Architecture
 
-## System Overview
-The system provides a real-time chat interface with feature steering capabilities, allowing users to adjust model behavior through feature controls and save configurations as model variants. It also includes a TestBench system for A/B testing different UI/UX implementations (🚧 TODO).
+### Core API Flows 
 
-## Logging Architecture ✓
-
-### Log Levels and Usage
-The system implements a progressive logging strategy with clear level separation:
-
-#### Production Environment
-- **ERROR**: Application errors requiring immediate attention
-  - Failed API calls
-  - SDK exceptions
-  - Critical system failures
-- **WARNING**: Important events that don't stop functionality
-  - Rate limiting events
-  - Fallback behaviors
-  - Performance degradation
-- **INFO**: Key operational events only
-  - Application startup/shutdown
-  - Session creation/deletion
-  - Major state changes
-  - Variant creation/modification
-
-#### Development/Staging Environments
-All production levels plus:
-- **DEBUG**: Detailed operational information
-  - Feature modification details
-  - API request/response data
-  - State transitions
-  - Performance metrics
-- **TRACE**: Most detailed debugging information
-  - Full payload logging
-  - Detailed SDK interactions
-  - Complete variant state dumps
-
-### Environment Configuration
-```python
-# Log levels by environment
-LOGGING_CONFIG = {
-    "production": "INFO",
-    "staging": "DEBUG",
-    "development": "TRACE"
-}
+#### Message (without autosteer)
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CI as Chat.tsx
+    participant CC as /chat/completions
+    participant FI as /features/inspect
+    
+    U->>CI: Send Message
+    CI->>CC: POST Request
+    CC-->>CI: Return Response
+    CI->>FI: POST Request
+    FI-->>CI: Show Feature Activations
 ```
 
-### Frontend Logging
-- Custom logger utility with environment awareness
-- Component-specific contexts
-- Structured log format
-- Console logging in development
-- Error reporting in production
-
-### Backend Logging
-- Standardized log formatting
-- Request correlation IDs
-- Structured JSON logging
-- Performance timing data
-- SDK interaction logging
-
-### Log Format Standards
-```
-[TIMESTAMP] [LEVEL] [COMPONENT] [CORRELATION_ID] Message
-```
-
-Example:
-```
-[2024-03-20 10:15:30] [INFO] [FeatureService] [sess_abc123] Feature steering applied: formal_writing=0.75
-```
-
-## Current API Trigger Flows 
-
-### Message Flow
+#### [TODO] Message (with autosteer)
 ```mermaid
 sequenceDiagram
     participant U as User
@@ -97,7 +43,7 @@ sequenceDiagram
     FI-->>CI: Show Feature Activations
 ```
 
-### Steering Flow
+#### Steering Flow
 ```mermaid
 sequenceDiagram
     participant U as User
@@ -122,7 +68,7 @@ sequenceDiagram
     CC-->>CI: New Completion
 ```
 
-### Feature Search Flow
+#### Feature Search Flow
 ```mermaid
 sequenceDiagram
     participant U as User
@@ -134,164 +80,112 @@ sequenceDiagram
     IP->>FS: POST Request
     FS-->>IP: Return Matching Features
     IP-->>U: Display Search Results Overlay
-    U->>IP: Adjust Feature from Results
-    IP->>FS: Steer Feature (if adjusted)
 ```
 
+## Service Layer Architecture
+The backend is organized into the following services with clear responsibilities:
 
-## Future API Trigger Flows 🚧 TODO
+#### Variant Service
+- Manages session and variant lifecycle
+- Stores and retrieves variant configurations
+- Provides variant caching and persistence
 
-### Streaming Message Flow
+#### Completion Service
+- Handles chat completion requests
+- Manages completion settings
+- Integrates with LLM providers
+
+#### Feature Service
+- Provides feature inspection capabilities
+- Handles feature steering operations
+- Manages feature search and clustering
+
+#### [TODO] Analysis Service 
+- Analyzes user queries
+- Determines optimal persona and features
+- Provides auto-steering recommendations
+
+
+## State Management
+
+### Core State Providers
+
+The application uses several context providers to manage different aspects of application state:
+
+**FeatureProvider:**
+- Manages feature modifications for steering LLM outputs
+- Stores feature labels and their steering values
+- Provides functions to set, clear, and retrieve feature modifications
+- Implemented in `frontend/src/contexts/FeatureContext.tsx`
+
+**TestBenchProvider:**
+- Manages component testing configurations
+- Tracks active tests and test definitions
+- Allows components to register tests and manage test state
+- Implemented in `frontend/src/lib/testbench/TestBenchProvider.tsx`
+
+### State Flow Architecture
+
+The application's state flow follows a clear hierarchy:
+
 ```mermaid
-sequenceDiagram
-    participant U as User
-    participant CI as Chat.tsx
-    participant CC as /chat/completions/stream
-    participant FI as /features/inspect
-    
-    U->>CI: Send Message
-    CI->>CC: SSE Connection
-    loop Streaming
-        CC-->>CI: Stream Tokens
-    end
-    CI->>FI: POST Request
-    FI-->>CI: Show Feature Activations
-```
-### TestBench Flow
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant TB as TestBench.tsx
-    participant TS as /test/status
-    participant TD as /test/data
-    
-    U->>TB: Configure Test
-    TB->>TS: POST Request
-    TS-->>TB: Test Status
-    TB->>TD: Store Results
-    TD-->>TB: Confirmation
-```
-## Current Implementation Details ✓
-
-### Frontend
-- React + Vite application
-- ShadcnUI components
-- Basic chat interface
-- Feature inspection panel
-- Real-time feature steering
-- Basic error handling
-
-### Backend
-- FastAPI application
-- Ember SDK integration
-- In-memory variant storage
-- Basic session management
-- Synchronous completions
-- Basic error handling
-
-## Testing Architecture ✓
-
-### Directory Structure
-```
-frontend/
-├── test/                    # Global test configuration
-│   ├── setup/              # Test setup files
-│   ├── helpers/            # Test utilities
-│   └── fixtures/           # Test data
-├── src/
-    ├── components/         # UI Components
-    │   └── ComponentName/
-    │       └── __tests__/  # Component-specific tests
-    └── contexts/           # Business Logic
-        └── __tests__/      # Context/state tests
+graph TD
+    A[App Component] --> B[FeatureProvider]
+    B --> C[TestBenchProvider]
+    C --> D[Component Tree]
+    D --> E[Chat Component]
+    D --> F[Controls Component]
+    E -- "Messages Update" --> A
+    F -- "Feature Steering" --> B
 ```
 
-### Component Tests
+**State Access Pattern:**
+- Components use custom hooks to access context state
+- For example: `useFeatureModifications()` provides access to feature state
+- This pattern encapsulates state access logic and ensures proper context usage
+
+**State Persistence:**
+- UI preferences stored in localStorage (e.g., split panel sizes)
+- Feature modifications maintained in Context during the session
+- Chat messages managed in local state with parent component coordination
+
+## Development Infrastructure
+
+### Logging Architecture 
+
+The system implements a progressive logging strategy with clear level separation across environments:
+
+**Log Levels by Environment:**
+- **Production**: ERROR, WARNING, INFO (key operational events only)
+- **Development/Staging**: All production levels plus DEBUG and TRACE
+
+**Log Format Standard:**
+```
+[TIMESTAMP] [LEVEL] [COMPONENT] [CORRELATION_ID] Message
+```
+
+Example:
+```
+[2024-03-20 10:15:30] [INFO] [FeatureService] [sess_abc123] Feature steering applied: formal_writing=0.75
+```
+
+### Testing Architecture 
+
+The project follows a component-based testing approach with clear separation of concerns:
+
+**Component Tests**
 Located in `src/components/*/`:
 - Focus on UI behavior and rendering
 - Test component-specific functionality
-- Verify:
-  - Rendering with different props
-  - User interactions
-  - Visual states (loading, error, empty)
-  - Props handling
-  - UI library integration
+- Verify rendering, user interactions, and UI states
 
-Example structure:
-```typescript
-describe('ComponentName', () => {
-  describe('Rendering', () => {
-    // Basic rendering tests
-  });
-  
-  describe('Interactions', () => {
-    // User interaction tests
-  });
-  
-  describe('State Management', () => {
-    // Component state tests
-  });
-});
-```
-
-### Context Tests
+**Context Tests**
 Located in `src/contexts/__tests__/`:
 - Focus on business logic and state management
 - Test application behavior layer
-- Verify:
-  - State transitions
-  - Business logic implementation
-  - Data flow
-  - API/Service integration
-  - Error handling
+- Verify state transitions, data flow, and error handling
 
-Example structure:
-```typescript
-describe('ContextName', () => {
-  describe('State Management', () => {
-    // State transition tests
-  });
-  
-  describe('Business Logic', () => {
-    // Core functionality tests
-  });
-  
-  describe('Error Handling', () => {
-    // Error case tests
-  });
-});
-```
-
-### Test Configuration
-- Uses Vitest as test runner
+**Core Testing Tools:**
+- Vitest as test runner
 - React Testing Library for component testing
-- Global test setup in `test/setup/setup.ts`
-- Shared test utilities in `test/helpers/`
 - Coverage reporting configured
-- Available commands:
-  ```bash
-  npm test           # Run all tests
-  npm run test:watch # Watch mode
-  npm run test:coverage # Generate coverage
-  npm run test:ui    # UI test runner
-  ```
-
-## Future Enhancements 🚧 TODO
-
-### Frontend
-- Streaming message support
-- Advanced error handling
-- TestBench UI components
-- Analytics dashboard
-- Configuration management UI
-
-### Backend
-- Persistent storage (Vercel KV)
-- Advanced session management
-- Rate limiting
-- Streaming support
-- TestBench service
-- Analytics service
-- Advanced error handling
-
-
