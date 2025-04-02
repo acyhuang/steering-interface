@@ -73,7 +73,7 @@ Example:
 [2024-03-20 10:15:30] [INFO] [FeatureService] [sess_abc123] Feature steering applied: formal_writing=0.75
 ```
 
-## Current API Trigger Flows ✓
+## Current API Trigger Flows 
 
 ### Message Flow
 ```mermaid

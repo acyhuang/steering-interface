@@ -6,12 +6,12 @@ This document outlines both currently implemented endpoints and planned future e
 
 ## Overview
 The Steering Interface API provides a secure wrapper around the Goodfire Ember SDK, enabling:
-- ✓ Real-time chat interactions with LLMs
-- ✓ Feature activation inspection
-- ✓ Dynamic feature steering
-- ✓ Basic variant state management (in-memory)
+- Real-time chat interactions with LLMs
+- Feature activation inspection
+- Dynamic feature steering
+- Basic variant state management (in-memory)
 - 🚧 TODO: Rate limiting and usage monitoring
-- ✓ Secure SDK key management
+- Secure SDK key management
 
 ## Base URL
 ```
@@ -35,7 +35,7 @@ The API currently uses a simplified session model:
 
 ### Chat
 
-#### Create Chat Completion ✓
+#### Create Chat Completion
 ```http
 POST /chat/completions
 ```
@@ -71,7 +71,7 @@ Creates a chat completion using the current model and variant settings.
 - Add SSE endpoint for real-time updates
 - Add connection recovery mechanisms
 
-#### Health Check ✓
+#### Health Check
 ```http
 GET /chat/health
 ```
@@ -87,7 +87,7 @@ Returns API health status.
 
 ### Features
 
-#### Inspect Features ✓
+#### Inspect Features
 ```http
 POST /features/inspect
 ```
@@ -118,7 +118,7 @@ Analyzes feature activations in the current conversation.
 ]
 ```
 
-#### Steer Feature ✓
+#### Steer Feature
 ```http
 POST /features/steer
 ```
@@ -144,7 +144,7 @@ Modifies a feature's activation value for the current variant.
 }
 ```
 
-#### Get Modified Features ✓
+#### Get Modified Features
 ```http
 GET /features/modified
 ```
@@ -157,7 +157,7 @@ Retrieves the complete variant state including all modifications.
 
 **Response:** Raw variant JSON containing all modifications and settings
 
-#### Clear Feature ✓
+#### Clear Feature
 ```http
 POST /features/clear
 ```
@@ -180,7 +180,7 @@ Removes a feature's modifications from the current variant.
 }
 ```
 
-#### Search Features ✓
+#### Search Features
 ```http
 POST /features/search
 ```
@@ -325,9 +325,9 @@ DELETE /test/delete
 ## Error Handling
 
 Current implementation:
-- ✓ Standard HTTP status codes
-- ✓ Basic error messages
-- ✓ Simple error response format
+- Standard HTTP status codes
+- Basic error messages
+- Simple error response format
 
 🚧 TODO: Enhanced error handling:
 - Detailed error codes
@@ -360,7 +360,7 @@ Variants represent different configurations of the model:
 - Default variant ID: `"default"`
 - Variants persist feature modifications within a session
 
-### Current API Trigger Flows ✓
+### Current API Trigger Flows
 
 ### Message Flow
 

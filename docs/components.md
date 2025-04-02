@@ -6,7 +6,7 @@ This document outlines both currently implemented features and planned future en
 
 ## Frontend Components
 
-### Chat Interface ✓
+### Chat Interface 
 - Main user interaction point for conversations
 - Handles message input/output
 - Manages chat history display
@@ -17,13 +17,16 @@ This document outlines both currently implemented features and planned future en
   - DEBUG: Message processing details, state updates
   - ERROR: Message failures, connection issues
 
-### Inspector Panel ✓
-- Displays current feature activations
-- Provides controls for feature adjustment
-- Updates in real-time as messages are processed
-- Shows feature search and filtering options
-- Semantic feature search with overlay results display
-- Allows steering of search results
+### Controls Panel 
+- Three tabs, all tabs allow for steering of features
+1. Activated
+  - Displays current feature activations
+  - Testbench includes clustered and unclustered views
+2. Modified
+  - Displays currently modified features
+3. Search
+  - Search bar to semantically search for features
+
 - **Logging**:
   - INFO: Feature modifications, search operations
   - DEBUG: Feature state changes, UI updates
@@ -36,14 +39,14 @@ This document outlines both currently implemented features and planned future en
 - Provides real-time component switching
 - Enables quick iteration on UI/UX changes
 
-### Connection Status ✓
+### Connection Status
 - Displays system connectivity state
 - Shows real-time connection health
 - Indicates ongoing operations
 
 ## Backend Services
 
-### Chat Completion Service ✓
+### Chat Completion Service 
 - Handles LLM interactions
 - Manages basic responses (🚧 TODO: Streaming responses)
 - Integrates model variant settings into completions
@@ -55,7 +58,7 @@ This document outlines both currently implemented features and planned future en
   - WARNING: Rate limits, performance issues
   - ERROR: SDK failures, completion errors
 
-### Feature Management Service ✓
+### Feature Management Service 
 - Provides a secure wrapper around the Ember SDK
 - Controls feature inspection and steering through SDK methods
 - Manages feature activation calculations via SDK
@@ -85,15 +88,15 @@ This document outlines both currently implemented features and planned future en
 
 ## Component Dependencies
 
-### Current Frontend Dependencies ✓
+### Current Frontend Dependencies 
 - Chat Interface → Feature Management (for inspection)
-- Inspector Panel → Feature Management (for steering)
+- Controls Panel → Feature Management (for steering)
 - All Components → Connection Status (for health monitoring)
 
 ### Future Frontend Dependencies 🚧 TODO
 - TestBench Control Panel → TestBench Service (for UI/UX testing)
 
-### Current Backend Dependencies ✓
+### Current Backend Dependencies 
 - Chat Completion ← Feature Management (for applying steering)
 - Feature Management ← In-Memory Variant System (for configuration)
 
@@ -103,7 +106,7 @@ This document outlines both currently implemented features and planned future en
 
 ## State Management
 
-### Current Implementation ✓
+### Current Implementation 
 
 #### Logging Standards
 - Use structured logging format
@@ -123,7 +126,7 @@ This document outlines both currently implemented features and planned future en
   - Error conditions
   - Performance metrics
 
-#### Inspector Panel
+#### Controls Panel
 - Current feature activations
 - Modified features
 - Search state
