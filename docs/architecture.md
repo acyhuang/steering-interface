@@ -83,28 +83,33 @@ sequenceDiagram
 ```
 
 ## Service Layer Architecture
-The backend is organized into the following services with clear responsibilities:
+The backend is organized using a hybrid approach with a main facade service and internal specialized service components:
 
-#### Variant Service
+#### EmberService (Facade)
+- Acts as a central coordination point for all LLM operations
+- Provides a unified API for controllers and API routes
+- Manages delegation to specialized internal services
+- Handles cross-cutting concerns (logging, error handling, etc.)
+
+#### VariantManager
 - Manages session and variant lifecycle
 - Stores and retrieves variant configurations
 - Provides variant caching and persistence
 
-#### Completion Service
+#### CompletionService
 - Handles chat completion requests
 - Manages completion settings
 - Integrates with LLM providers
 
-#### Feature Service
+#### FeatureService
 - Provides feature inspection capabilities
 - Handles feature steering operations
 - Manages feature search and clustering
 
-#### [TODO] Analysis Service 
+#### AnalysisService
 - Analyzes user queries
 - Determines optimal persona and features
 - Provides auto-steering recommendations
-
 
 ## State Management
 

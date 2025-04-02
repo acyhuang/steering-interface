@@ -38,6 +38,16 @@ class SearchFeaturesRequest(BaseModel):
     variant_id: Optional[str] = None
     top_k: Optional[int] = 20
 
+class CreateVariantRequest(BaseModel):
+    """Model for variant creation requests."""
+    session_id: str
+    base_variant_id: Optional[str] = None
+
+class CreateVariantResponse(BaseModel):
+    """Model for variant creation responses."""
+    variant_id: str
+    model: str
+
 @router.post("/inspect", response_model=List[FeatureActivation])
 async def inspect_features(
     request: InspectFeaturesRequest,
@@ -197,4 +207,34 @@ async def auto_steer(
         
     except Exception as e:
         logger.error(f"Error during auto-steering: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/variants", response_model=CreateVariantResponse)
+async def create_variant(
+    request: CreateVariantRequest,
+    ember_service: EmberService = Depends(get_ember_service)
+) -> CreateVariantResponse:
+    """Create a new variant, optionally based on an existing one.
+    
+    A UUID will be generated automatically.
+    """
+    logger.info(f"Received variant creation request for session {request.session_id}")
+    
+    try:
+        variant = await ember_service.create_variant(
+            session_id=request.session_id,
+            base_variant_id=request.base_variant_id,
+        )
+        
+        # Determine variant ID (UUID)
+        variant_id = str(variant).split('/')[-1]
+        
+        logger.info(f"Successfully created variant {variant_id}")
+        return CreateVariantResponse(
+            variant_id=variant_id,
+            model=variant.model_name
+        )
+        
+    except Exception as e:
+        logger.error(f"Error during variant creation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 

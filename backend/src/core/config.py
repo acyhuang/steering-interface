@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     default_model: str = "meta-llama/Llama-3.3-70B-Instruct"
     
     # OpenAI settings for feature clustering
-    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: str = None
     openai_model: str = "gpt-4o-mini"
     
     # Environment and logging

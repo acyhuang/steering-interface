@@ -34,7 +34,7 @@ async def create_chat_completion(
         })
         
         # For now, use a simple session ID. Later we'll implement proper session management
-        session_id = "default_session"  # TODO: Implement proper session management
+        session_id = "default"  # TODO: Implement proper session management
         
         # # First, analyze the query to determine optimal persona and features
         # last_message = request.messages[-1] if request.messages else None

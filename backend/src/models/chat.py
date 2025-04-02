@@ -7,7 +7,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
-    variant_id: Optional[str] = None
+    variant_id: str
     max_completion_tokens: int = 512
     temperature: float = 0.7
     top_p: float = 0.9
@@ -15,4 +15,3 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     content: str
     variant_id: str
-    variant_json: Optional[str] = None 
