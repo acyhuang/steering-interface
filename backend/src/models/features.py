@@ -15,7 +15,7 @@ class FeatureActivation(BaseModel):
 class SteerFeatureRequest(BaseModel):
     """Model for feature steering requests."""
     session_id: str
-    variant_id: Optional[str] = None
+    variant_id: str
     feature_label: str
     value: float
 
@@ -38,7 +38,7 @@ class ModifiedFeature(BaseModel):
 class ClearFeatureRequest(BaseModel):
     """Model for feature clearing requests."""
     session_id: str
-    variant_id: Optional[str] = None
+    variant_id: str
     feature_label: str
 
 class ClearFeatureResponse(BaseModel):
@@ -72,7 +72,7 @@ class ClusterFeaturesRequest(BaseModel):
     """
     features: List[FeatureActivation]
     session_id: str
-    variant_id: Optional[str] = None
+    variant_id: str
     force_refresh: bool = False
 
 class ClusteredFeaturesResponse(BaseModel):
@@ -128,7 +128,7 @@ class QueryAnalysisRequest(BaseModel):
     """
     query: str
     session_id: str
-    variant_id: Optional[str] = None
+    variant_id: str
     context: Optional[Dict[str, List[ChatMessage]]] = None
 
 class QueryAnalysisResponse(BaseModel):
@@ -164,7 +164,7 @@ class AutoSteerRequest(BaseModel):
     """
     analysis: QueryAnalysisResponse
     session_id: str
-    variant_id: Optional[str] = None
+    variant_id: str
     max_features: Optional[int] = 5
 
 class AutoSteerResponse(BaseModel):

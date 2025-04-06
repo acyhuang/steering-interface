@@ -1,0 +1,1 @@
+"""Interface definitions for service components.""" 

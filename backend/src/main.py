@@ -4,6 +4,7 @@ from .api import chat, features
 from dotenv import load_dotenv
 from .core.logging import setup_logging
 from .core.config import get_settings
+import logging
 
 # Load environment variables
 load_dotenv()
