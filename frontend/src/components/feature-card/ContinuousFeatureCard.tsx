@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { createLogger } from "@/lib/logger"
 import { featuresApi } from "@/lib/api"
 import { FeatureCardProps } from "./variants"
-import { useFeatureModifications } from "@/contexts/FeatureContext"
+import { useFeatureActivations } from "@/contexts/FeatureActivationContext"
+import { useVariant } from "@/contexts/VariantContext"
 
 const logger = createLogger('ContinuousFeatureCard')
 
@@ -12,28 +13,30 @@ export function ContinuousFeatureCard({
   feature, 
   onSteer, 
   onFeatureModified,
-  readOnly,
-  variantId = "default",
-  testId  // Keep testId for TestBench but don't use it for model operations
+  readOnly
 }: FeatureCardProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const { getModification, setModification, clearModification } = useFeatureModifications();
+  const { getFeatureActivation, activeFeatures, setActiveFeatures } = useFeatureActivations();
+  const { variantId } = useVariant();
+  const [modification, setModification] = useState<number | undefined>(undefined);
   
-  // Initialize slider with existing modification or 0 (neutral position)
+  // Initialize slider with existing activation or 0 (neutral position)
   const [sliderValue, setSliderValue] = useState<number[]>(() => {
-    const existingMod = getModification(feature.label);
-    return [existingMod ?? 0]; // Default to 0 if no modification exists
+    const existingActivation = getFeatureActivation(feature.label);
+    return [existingActivation ?? 0]; // Default to 0 if no activation exists
   });
 
-  // Update slider when modifications change externally
+  // Update slider when activations change externally
   useEffect(() => {
-    const mod = getModification(feature.label);
-    if (mod !== undefined) {
-      setSliderValue([mod]);
+    const activation = getFeatureActivation(feature.label);
+    if (activation !== undefined) {
+      setSliderValue([activation]);
+      setModification(activation);
     } else {
-      setSliderValue([0]); // Reset to neutral position when modification is cleared
+      setSliderValue([0]); // Reset to neutral position when activation is not found
+      setModification(undefined);
     }
-  }, [feature.label, getModification]);
+  }, [feature.label, getFeatureActivation]);
 
   const handleValueChange = async (newValue: number[]) => {
     setSliderValue(newValue);
@@ -54,13 +57,22 @@ export function ContinuousFeatureCard({
       // If the slider is at 0, clear the feature
       if (steeringValue === 0) {
         const response = await featuresApi.clearFeature({
-          session_id: variantId,
+          session_id: "default_session",
           variant_id: variantId,
           feature_label: feature.label
         });
 
-        // Clear the modification in global state
-        clearModification(feature.label);
+        // Clear the modification in local state
+        setModification(undefined);
+        
+        // Update the active features list by removing or updating this feature
+        setActiveFeatures(
+          activeFeatures.map(f => 
+            f.label === feature.label 
+              ? { ...f, activation: 0 } 
+              : f
+          )
+        );
         
         onSteer?.({ 
           label: response.label,
@@ -70,26 +82,43 @@ export function ContinuousFeatureCard({
       } else {
         // Otherwise apply the new value
         const response = await featuresApi.steerFeature({
-          session_id: variantId,
+          session_id: "default_session",
           variant_id: variantId,
           feature_label: feature.label,
           value: steeringValue
         });
 
-        // Update global modification state
-        setModification(feature.label, steeringValue);
+        // Update local modification state
+        setModification(steeringValue);
+        
+        // Update active features list with the new value
+        const updatedFeatures = [...activeFeatures];
+        const existingIndex = updatedFeatures.findIndex(f => f.label === feature.label);
+        
+        if (existingIndex >= 0) {
+          updatedFeatures[existingIndex] = {
+            ...updatedFeatures[existingIndex],
+            activation: response.activation
+          };
+        } else {
+          updatedFeatures.push({
+            label: feature.label,
+            activation: response.activation
+          });
+        }
+        
+        setActiveFeatures(updatedFeatures);
         onSteer?.(response);
       }
 
       onFeatureModified?.();
     } catch (error) {
-      logger.error('Failed to modify feature:', error);
+      // Fix the logger.error call to properly handle unknown error type
+      logger.error('Failed to modify feature:', { error: error instanceof Error ? error.message : String(error) });
     } finally {
       setIsLoading(false);
     }
   };
-
-  const modification = getModification(feature.label);
 
   return (
     <Card className="p-4">
