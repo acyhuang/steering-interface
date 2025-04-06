@@ -100,6 +100,7 @@ class IFeatureService(ABC):
         self,
         features: List[FeatureActivation],
         session_id: str,
+        variant_id: Optional[str] = None,
         force_refresh: bool = False,
         num_categories: int = 5
     ) -> List[FeatureCluster]:
@@ -108,6 +109,7 @@ class IFeatureService(ABC):
         Args:
             features: List of features to cluster
             session_id: Session identifier
+            variant_id: Optional variant identifier
             force_refresh: Whether to force a refresh of clusters
             num_categories: Number of categories to create
             

@@ -269,6 +269,7 @@ class FeatureService(IFeatureService):
         self,
         features: List[FeatureActivation],
         session_id: str,
+        variant_id: Optional[str] = None,
         force_refresh: bool = False,
         num_categories: int = 5
     ) -> List[FeatureCluster]:
