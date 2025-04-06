@@ -9,7 +9,8 @@ import { featuresApi } from "@/lib/api"
 import { createLogger } from "@/lib/logger"
 import { TestBenchProvider } from "@/lib/testbench/TestBenchProvider"
 import { TestBenchPanel } from "@/lib/testbench/TestBenchPanel"
-import { FeatureProvider } from "@/contexts/FeatureContext"
+import { FeatureActivationProvider } from "@/contexts/FeatureActivationContext"
+import { VariantProvider } from "./contexts/VariantContext"
 
 const logger = createLogger('App')
 
@@ -53,42 +54,44 @@ function App() {
   const handleTestChange = (testId: string) => {
     setCurrentTestId(testId)
   }
-
   return (
-    <FeatureProvider>
-      <TestBenchProvider>
-        <div className="h-screen flex flex-col">
-          <div className="p-4 flex justify-between items-center">
-            <TestBenchPanel />
-            <ConnectionStatus />
+    <VariantProvider>
+      <FeatureActivationProvider>
+        <TestBenchProvider>
+          <div className="h-screen flex flex-col">
+            <div className="p-4 flex justify-between items-center">
+              <TestBenchPanel />
+              <ConnectionStatus />
+            </div>
+            <Split 
+              className="flex-1 flex gap-4 p-4 overflow-hidden split"
+              sizes={sizes}
+              minSize={[400, 400]} 
+              onDragEnd={setSizes}
+              gutterStyle={() => ({
+                backgroundColor: '#e5e7eb', // light gray
+                width: '4px',
+                cursor: 'col-resize'
+              })}
+            >
+              <div className="h-full">
+                <Chat 
+                  onMessagesUpdate={handleMessagesUpdate}
+                />
+              </div>
+              <div className="h-full">
+                <Controls 
+                  features={features} 
+                  isLoading={isLoadingFeatures}
+                  variantId={currentTestId}
+                />
+              </div>
+            </Split>
           </div>
-          <Split 
-            className="flex-1 flex gap-4 p-4 overflow-hidden split"
-            sizes={sizes}
-            minSize={[400, 400]} 
-            onDragEnd={setSizes}
-            gutterStyle={() => ({
-              backgroundColor: '#e5e7eb', // light gray
-              width: '4px',
-              cursor: 'col-resize'
-            })}
-          >
-            <div className="h-full">
-              <Chat 
-                onMessagesUpdate={handleMessagesUpdate}
-              />
-            </div>
-            <div className="h-full">
-              <Controls 
-                features={features} 
-                isLoading={isLoadingFeatures}
-                variantId={currentTestId}
-              />
-            </div>
-          </Split>
-        </div>
-      </TestBenchProvider>
-    </FeatureProvider>
+        </TestBenchProvider>
+      </FeatureActivationProvider>
+    </VariantProvider>
+    
   )
 }
 

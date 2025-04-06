@@ -1,12 +1,13 @@
 import { Button } from "../ui/button"
 import { Card } from "../ui/card"
 import { ChevronsUp, ChevronUp, ChevronDown, ChevronsDown } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { featuresApi } from "@/lib/api"
 import { createLogger } from "@/lib/logger"
 import { FeatureCardProps } from "./variants"
-import { useFeatureModifications } from "@/contexts/FeatureContext"
+import { useFeatureActivations } from "@/contexts/FeatureActivationContext"
+import { useVariant } from "@/contexts/VariantContext"
 
 const logger = createLogger('DiscreteFeatureCard')
 
@@ -15,12 +16,14 @@ export function DiscreteFeatureCard({
   onSteer, 
   onFeatureModified, 
   readOnly,
-  variantId = "default",
-  testId  // Keep testId for TestBench but don't use it for model operations
 }: FeatureCardProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const { getModification, setModification, clearModification } = useFeatureModifications();
-  const modification = getModification(feature.label);
+  const { getFeatureActivation, activeFeatures, setActiveFeatures } = useFeatureActivations();
+  const { variantId } = useVariant();
+  const [modification, setModification] = useState<number | undefined>(undefined);
+  
+  // Get the current activation value for this feature
+  const activation = getFeatureActivation(feature.label);
 
   const handleSteer = async (value: number) => {
     if (isLoading) return;
@@ -37,13 +40,22 @@ export function DiscreteFeatureCard({
       // If clicking the same button that's already active, clear the feature
       if (modification === value) {
         const response = await featuresApi.clearFeature({
-          session_id: variantId,
+          session_id: "default_session",
           variant_id: variantId,
           feature_label: feature.label
         });
 
-        // Clear the modification in global state
-        clearModification(feature.label);
+        // Clear the modification in local state
+        setModification(undefined);
+        
+        // Update the active features list by removing or updating this feature
+        setActiveFeatures(
+          activeFeatures.map(f => 
+            f.label === feature.label 
+              ? { ...f, activation: 0 } 
+              : f
+          )
+        );
         
         onSteer?.({ 
           label: response.label,
@@ -53,20 +65,38 @@ export function DiscreteFeatureCard({
       } else {
         // Otherwise apply the new value
         const response = await featuresApi.steerFeature({
-          session_id: variantId,
+          session_id: "default_session",
           variant_id: variantId,
           feature_label: feature.label,
           value: value
         });
 
-        // Update global modification state
-        setModification(feature.label, value);
+        // Update local modification state
+        setModification(value);
+        
+        // Update active features list with the new value
+        const updatedFeatures = [...activeFeatures];
+        const existingIndex = updatedFeatures.findIndex(f => f.label === feature.label);
+        
+        if (existingIndex >= 0) {
+          updatedFeatures[existingIndex] = {
+            ...updatedFeatures[existingIndex],
+            activation: response.activation
+          };
+        } else {
+          updatedFeatures.push({
+            label: feature.label,
+            activation: response.activation
+          });
+        }
+        
+        setActiveFeatures(updatedFeatures);
         onSteer?.(response);
       }
 
       onFeatureModified?.();
     } catch (error) {
-      logger.error('Failed to modify feature:', error);
+      logger.error('Failed to modify feature:', { error: error instanceof Error ? error.message : String(error) });
     } finally {
       setIsLoading(false);
     }
