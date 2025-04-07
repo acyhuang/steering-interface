@@ -3,24 +3,26 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { ChatMessage } from '@/types/chat';
-import { chatApi } from '@/lib/api';
+import { chatApi, featuresApi } from '@/lib/api';
 import { Textarea } from './ui/textarea';
+import { useVariant } from '@/contexts/VariantContext';
+import { useFeatureActivations } from '@/contexts/FeatureActivationContext';
+import { createLogger } from '@/lib/logger';
 
 interface ChatProps {
-  onMessagesUpdate?: (messages: ChatMessage[]) => void;
   onVariantChange?: (variantId: string) => void;
 }
 
-export function Chat({ onMessagesUpdate, onVariantChange }: ChatProps) {
+export function Chat({ onVariantChange }: ChatProps) {
+  const logger = createLogger('Chat');
+  const { variantId, setVariantId } = useVariant();
+  const { setActiveFeatures, setFeatureClusters } = useFeatureActivations();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [currentVariant, setCurrentVariant] = useState<string>("default");
-  const [variantJson, setVariantJson] = useState<string>("");
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Add auto-resize effect
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
@@ -32,6 +34,42 @@ export function Chat({ onMessagesUpdate, onVariantChange }: ChatProps) {
   useEffect(() => {
     adjustTextareaHeight();
   }, [input]);
+
+  const processFeatures = async (messageList: ChatMessage[]) => {
+    try {
+      logger.debug('Inspecting features for messages', { messageCount: messageList.length });
+      
+      // Step 1: Call inspect features
+      const features = await featuresApi.inspectFeatures({
+        messages: messageList,
+        session_id: "default_session" // TODO: Use real session management
+      });
+      
+      logger.debug('Feature inspection completed', { featureCount: features.length });
+      setActiveFeatures(features);
+      
+      // Step 2: Cluster the features
+      if (features.length > 0) {
+        logger.debug('Clustering features', { featureCount: features.length });
+        const clusterResponse = await featuresApi.clusterFeatures(
+          features,
+          "default_session",
+          variantId
+        );
+        
+        if (clusterResponse?.clusters) {
+          logger.debug('Feature clustering completed', { 
+            clusterCount: clusterResponse.clusters.length 
+          });
+          setFeatureClusters(clusterResponse.clusters);
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to process features', { 
+        error: error instanceof Error ? { message: error.message } : { raw: String(error) } 
+      });
+    }
+  };
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -48,9 +86,10 @@ export function Chat({ onMessagesUpdate, onVariantChange }: ChatProps) {
     try {
       const response = await chatApi.createChatCompletion({
         messages: [...messages, userMessage],
+        variant_id: variantId
       });
 
-      console.log('Response from API:', response);
+      logger.debug('Response from API', { response });
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',
@@ -59,18 +98,19 @@ export function Chat({ onMessagesUpdate, onVariantChange }: ChatProps) {
 
       const updatedMessages = [...messages, userMessage, assistantMessage];
       setMessages(updatedMessages);
-      setCurrentVariant(response.variant_id);
-      onVariantChange?.(response.variant_id);
-      if (response.variant_json) {
-        console.log('Setting variant JSON:', response.variant_json);
-        setVariantJson(response.variant_json);
-      } else {
-        console.log('No variant JSON in response');
+      
+      // Update variant if returned in response
+      if (response.variant_id && response.variant_id !== variantId) {
+        setVariantId(response.variant_id);
+        onVariantChange?.(response.variant_id);
       }
       
-      onMessagesUpdate?.(updatedMessages);
+      // Process features after completion
+      await processFeatures(updatedMessages);
     } catch (error) {
-      console.error('Failed to send message:', error);
+      logger.error('Failed to send message', { 
+        error: error instanceof Error ? { message: error.message } : { raw: String(error) } 
+      });
       // TODO: Add error handling UI
     } finally {
       setIsLoading(false);
@@ -92,6 +132,7 @@ export function Chat({ onMessagesUpdate, onVariantChange }: ChatProps) {
     try {
       const response = await chatApi.createChatCompletion({
         messages: contextMessages,
+        variant_id: variantId
       });
 
       const assistantMessage: ChatMessage = {
@@ -101,15 +142,19 @@ export function Chat({ onMessagesUpdate, onVariantChange }: ChatProps) {
 
       const updatedMessages = [...contextMessages, assistantMessage];
       setMessages(updatedMessages);
-      setCurrentVariant(response.variant_id);
-      onVariantChange?.(response.variant_id);
-      if (response.variant_json) {
-        setVariantJson(response.variant_json);
+      
+      // Update variant if returned in response
+      if (response.variant_id && response.variant_id !== variantId) {
+        setVariantId(response.variant_id);
+        onVariantChange?.(response.variant_id);
       }
       
-      onMessagesUpdate?.(updatedMessages);
+      // Process features after regeneration
+      await processFeatures(updatedMessages);
     } catch (error) {
-      console.error('Failed to regenerate message:', error);
+      logger.error('Failed to regenerate message', { 
+        error: error instanceof Error ? { message: error.message } : { raw: String(error) } 
+      });
     } finally {
       setIsLoading(false);
       setIsRegenerating(false);
@@ -128,12 +173,7 @@ export function Chat({ onMessagesUpdate, onVariantChange }: ChatProps) {
     <Card className="flex flex-col h-full">
       <div className="p-2 border-b bg-muted/50">
         <div className="text-sm text-muted-foreground space-y-1">
-          <div>Current Variant: <span className="font-medium">{currentVariant}</span></div>
-          {/* {variantJson && (
-            <div className="text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-32">
-              {variantJson}
-            </div>
-          )} */}
+          <div>Current Variant: <span className="font-medium">{variantId}</span></div>
         </div>
       </div>
       <ScrollArea className="flex-1 p-4">

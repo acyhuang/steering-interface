@@ -43,7 +43,10 @@ class FeatureService(IFeatureService):
         self.variant_manager = variant_manager
         self.llm_client = llm_client
         self.settings = settings
-        logger.info("Initialized FeatureService")
+        logger.debug("FeatureService initialized", extra={
+            "client_type": type(client).__name__,
+            "llm_client_type": type(llm_client).__name__
+        })
     
     @with_correlation_id()
     @log_timing(logger)

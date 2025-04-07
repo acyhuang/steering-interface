@@ -1,5 +1,6 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { createLogger } from '@/lib/logger';
+import { featuresApi } from '@/lib/api';
 
 // Logger for this context
 const logger = createLogger('VariantContext');
@@ -32,22 +33,19 @@ export function VariantProvider({
   const [variantJson, setVariantJson] = useState<any | null>(null);
 
   // Function to refresh variant data from the backend
-  const refreshVariant = async () => {
+  const refreshVariant = useCallback(async () => {
     try {
-      // This would call the /features/modified endpoint
-      // const response = await featuresApi.getModifiedFeatures(variantId);
-      // setVariantJson(response);
-      logger.debug('Refreshed variant data', { variantId });
+      const response = await featuresApi.getModifiedFeatures("default_session", variantId);
+      setVariantJson(response);
     } catch (error) {
       logger.error('Failed to refresh variant data', { error });
     }
-  };
+  }, [variantId]);
 
   // When variant ID changes, refresh the variant data
   useEffect(() => {
-    logger.debug('Variant ID changed', { variantId });
     refreshVariant();
-  }, [variantId]);
+  }, [variantId, refreshVariant]);
 
   // Context value
   const value = {

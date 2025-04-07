@@ -2,23 +2,22 @@ import { Input } from "./ui/input"
 import { Card } from "./ui/card"
 import { ScrollArea } from "./ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Search } from "lucide-react"
 import { Button } from "./ui/button"
 import { 
   FeatureActivation, 
   SteerFeatureResponse, 
-  FeatureCluster,
-  ClusteredFeaturesResponse 
+  FeatureCluster
 } from "@/types/features"
 import { featuresApi } from "@/lib/api"
 import { useFeatureCardVariant } from './feature-card'
 import { useFeatureListVariant } from './feature-list'
 import { useLogger } from '@/lib/logger'
+import { useFeatureActivations } from '@/contexts/FeatureActivationContext'
+import { useVariant } from '@/contexts/VariantContext'
 
 interface ControlsProps {
-  features?: FeatureActivation[];
-  isLoading?: boolean;
   variantId?: string;
 }
 
@@ -35,144 +34,96 @@ interface VariantResponse {
   scopes: any[];
 }
 
-export function Controls({ features, isLoading, variantId = "default" }: ControlsProps) {
+export function Controls({ variantId = "default" }: ControlsProps) {
   const logger = useLogger('Controls')
+  const { activeFeatures, featureClusters, isLoading } = useFeatureActivations();
+  const { variantJson, refreshVariant } = useVariant();
   const [searchQuery, setSearchQuery] = useState("")
-  const [localFeatures, setLocalFeatures] = useState(features || [])
-  const [variantJson, setVariantJson] = useState<VariantResponse | null>(null)
   const [modifiedFeatures, setModifiedFeatures] = useState<FeatureActivation[]>([])
   const [isLoadingModified, setIsLoadingModified] = useState(false)
   const [selectedTab, setSelectedTab] = useState("activated")
   const [searchResults, setSearchResults] = useState<FeatureActivation[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [clusters, setClusters] = useState<FeatureCluster[]>([])
-  const [isClusteringLoading, setIsClusteringLoading] = useState(false)
+  const refreshInProgressRef = useRef(false);
   
   const FeatureCardVariant = useFeatureCardVariant();
   const FeatureListVariant = useFeatureListVariant();
 
-  // Log initial mount
+  // Process variantJson into modifiedFeatures when it changes
   useEffect(() => {
-    logger.debug('Controls component mounted');
-    return () => {
-      logger.debug('Controls component unmounted');
-    };
-  }, [logger]);
-
-  // Log feature changes
-  useEffect(() => {
-    if (features) {
-      logger.debug('Features updated', { 
-        count: features.length,
-        hasClusters: clusters.length > 0
-      });
-    }
-  }, [features, clusters.length, logger]);
-
-  // Log tab changes
-  useEffect(() => {
-    logger.debug('Tab changed', { selectedTab, variantId });
-  }, [selectedTab, variantId, logger]);
-
-  const fetchClusters = useCallback(async () => {
-    if (!localFeatures || localFeatures.length === 0) return;
-    
-    setIsClusteringLoading(true);
-    try {
-      logger.debug('Fetching clusters for features', { featureCount: localFeatures.length });
-      const response = await featuresApi.clusterFeatures(
-        localFeatures,
-        variantId,
-        variantId,
-        false
-      );
+    if (variantJson) {
+      setIsLoadingModified(true);
       
-      const clusteredFeatures = response?.clusters || [];
-      setClusters(clusteredFeatures);
-      
-      logger.debug('Clusters updated', {
-        count: clusteredFeatures.length,
-        featuresCount: localFeatures.length
-      });
-    } catch (error) {
-      logger.error('Failed to fetch clusters', { error });
-      setClusters([]);
-    } finally {
-      setIsClusteringLoading(false);
-    }
-  }, [localFeatures, variantId, logger]);
-
-  useEffect(() => {
-    setLocalFeatures(features || [])
-    
-    // Only fetch clusters if we don't already have them for these features
-    if (features && features.length > 0 && (!clusters || clusters.length === 0)) {
-      fetchClusters();
-    }
-  }, [features, fetchClusters, clusters])
-
-  const fetchVariantJson = useCallback(async () => {
-    setIsLoadingModified(true)
-    logger.debug('Fetching modified features for variant', { variantId });
-    try {
-      const response = await featuresApi.getModifiedFeatures(variantId);
-      logger.debug('Received variant state', { response });
-      setVariantJson(response);
-      
-      // Transform variant JSON into FeatureActivation format
-      if (response && Array.isArray(response.edits)) {
-        const features: FeatureActivation[] = response.edits.map((edit: FeatureEdit) => ({
-          label: edit.feature_label,
-          activation: typeof edit.value === 'number' ? edit.value : 0
-        }));
-        setModifiedFeatures(features);
-      } else {
+      try {
+        // Transform variant JSON into FeatureActivation format
+        if (variantJson && Array.isArray(variantJson.edits)) {
+          const features: FeatureActivation[] = variantJson.edits.map((edit: FeatureEdit) => ({
+            label: edit.feature_label,
+            activation: typeof edit.value === 'number' ? edit.value : 0
+          }));
+          setModifiedFeatures(features);
+        } else {
+          setModifiedFeatures([]);
+        }
+      } catch (error) {
+        logger.error('Failed to process variant JSON', { error });
         setModifiedFeatures([]);
+      } finally {
+        setIsLoadingModified(false);
+        refreshInProgressRef.current = false;
       }
-    } catch (error) {
-      logger.error('Failed to fetch variant state', { error });
-      setModifiedFeatures([]);
-    } finally {
-      setIsLoadingModified(false)
     }
-  }, [variantId, logger]);
+  }, [variantJson, logger]);
 
+  // Only refresh data when tab changes to "modified"
   useEffect(() => {
-    logger.debug('Tab or variant changed', { selectedTab, variantId });
-    if (selectedTab === "modified") {
-      fetchVariantJson();
-    }
-  }, [selectedTab, fetchVariantJson]);
+    const fetchData = async () => {
+      if (selectedTab === "modified" && !refreshInProgressRef.current) {
+        refreshInProgressRef.current = true;
+        logger.debug('Loading modified features tab data');
+        await refreshVariant();
+      }
+    };
+
+    fetchData();
+  }, [selectedTab]); // Deliberately exclude refreshVariant to prevent infinite loops
 
   const handleSteer = async (response: SteerFeatureResponse) => {
     logger.debug('Handling steer response', { response });
     
     const steerRequest = {
-      session_id: variantId,
+      session_id: "default_session",
       variant_id: variantId,
       feature_label: response.label,
       value: response.activation
     };
     logger.debug('Making steer request', { request: steerRequest });
     
-    setLocalFeatures(current => 
-      current.map(f => 
-        f.label === response.label 
-          ? { ...f, activation: response.activation }
-          : f
-      )
-    );
+    try {
+      // Make the actual API call to steer the feature
+      await featuresApi.steerFeature(steerRequest);
+      logger.debug('Feature steering successful', { 
+        feature: response.label, 
+        value: response.activation 
+      });
+      
+      if (selectedTab === "modified") {
+        logger.debug('On modified tab, refreshing variant data');
+        refreshInProgressRef.current = true;
+        await refreshVariant();
+      }
 
-    if (selectedTab === "modified") {
-      logger.debug('On modified tab, fetching updated variant state');
-      await fetchVariantJson();
-    }
-
-    // Regenerate the last message after steering
-    // @ts-ignore
-    if (window.regenerateLastMessage) {
+      // Regenerate the last message after steering
       // @ts-ignore
-      await window.regenerateLastMessage();
+      if (window.regenerateLastMessage) {
+        // @ts-ignore
+        await window.regenerateLastMessage();
+      }
+    } catch (error) {
+      logger.error('Failed to steer feature', { 
+        error: error instanceof Error ? error.message : String(error),
+        feature: response.label
+      });
     }
   }
 
@@ -185,7 +136,7 @@ export function Controls({ features, isLoading, variantId = "default" }: Control
       logger.debug("Searching for features with query", { query: searchQuery });
       const results = await featuresApi.searchFeatures({
         query: searchQuery,
-        session_id: variantId,
+        session_id: "default_session",
         variant_id: variantId,
         top_k: 10
       });
@@ -201,11 +152,11 @@ export function Controls({ features, isLoading, variantId = "default" }: Control
   }
 
   const renderActivatedFeatures = () => {
-    if (isLoading || isClusteringLoading) {
+    if (isLoading) {
       return <div className="text-sm text-gray-500">Loading features...</div>;
     }
 
-    if (!localFeatures || localFeatures.length === 0) {
+    if (!activeFeatures || activeFeatures.length === 0) {
       return (
         <div className="text-sm text-gray-500">
           No activated features. Start a conversation to see features in use.
@@ -215,8 +166,8 @@ export function Controls({ features, isLoading, variantId = "default" }: Control
 
     return (
       <FeatureListVariant
-        features={localFeatures}
-        clusters={clusters}
+        features={activeFeatures}
+        clusters={featureClusters}
         onSteer={handleSteer}
         variantId={variantId}
       />
@@ -300,20 +251,14 @@ export function Controls({ features, isLoading, variantId = "default" }: Control
               <TabsContent value="modified" className="m-0">
                 {isLoadingModified ? (
                   <div className="text-sm text-gray-500">Loading variant state...</div>
-                ) : modifiedFeatures.length > 0 ? (
-                  <div className="space-y-2 pr-4">
-                    {modifiedFeatures.map((feature, index) => (
-                      <FeatureCardVariant
-                        key={index}
-                        feature={feature}
-                        onSteer={handleSteer}
-                        variantId={variantId}
-                      />
-                    ))}
-                  </div>
                 ) : (
-                  <div className="text-sm text-gray-500">
-                    No modified features available.
+                  <div className="space-y-2 pr-4">
+                    <div className="p-2 bg-gray-100 rounded text-xs font-mono">
+                      <div className="font-semibold mb-2">Raw variantJson:</div>
+                      <pre className="whitespace-pre-wrap overflow-auto">
+                        {JSON.stringify(variantJson, null, 2)}
+                      </pre>
+                    </div>
                   </div>
                 )}
               </TabsContent>
