@@ -8,6 +8,7 @@ export interface ModifiedFeature {
 export interface FeatureActivation {
   label: string;
   activation: number;
+  modifiedActivation?: number;
 }
 
 export interface InspectFeaturesRequest {

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { 
   FeatureActivation, 
   FeatureCluster,
@@ -30,16 +30,53 @@ export interface FeatureActivationProviderProps {
 
 export function FeatureActivationProvider({ children }: FeatureActivationProviderProps) {
   const logger = useLogger('FeatureActivationContext');
-  const { variantId } = useVariant();
+  const { variantId, variantJson } = useVariant();
   const [activeFeatures, setActiveFeaturesState] = useState<FeatureActivation[]>([]);
   const [featureClusters, setFeatureClustersState] = useState<FeatureCluster[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Set active features
+  // Set active features with modifiedActivation initialized to 0
   const setActiveFeatures = useCallback((features: FeatureActivation[]) => {
     logger.debug('Setting active features', { count: features.length });
-    setActiveFeaturesState(features);
+    
+    // Initialize with modifiedActivation = 0, but check for existing modifications in variant
+    const featuresWithModified = features.map(feature => ({
+      ...feature,
+      modifiedActivation: 0 // Default to 0, will be updated from variant if available
+    }));
+    
+    setActiveFeaturesState(featuresWithModified);
   }, [logger]);
+
+  // Update modifiedActivation values when variantJson changes
+  useEffect(() => {
+    if (variantJson && Array.isArray(variantJson.edits) && activeFeatures.length > 0) {
+      logger.debug('Updating modified activations from variant data', {
+        editCount: variantJson.edits.length,
+        featureCount: activeFeatures.length
+      });
+      
+      // Create a map of feature label to modified value
+      const modifiedValuesMap = new Map();
+      
+      variantJson.edits.forEach((edit: any) => {
+        if (edit.feature_label && typeof edit.value === 'number') {
+          modifiedValuesMap.set(edit.feature_label, edit.value);
+        }
+      });
+      
+      // Update activeFeatures with modified values from the variant
+      const updatedFeatures = activeFeatures.map(feature => {
+        const modifiedValue = modifiedValuesMap.get(feature.label);
+        return {
+          ...feature,
+          modifiedActivation: modifiedValue !== undefined ? modifiedValue : 0
+        };
+      });
+      
+      setActiveFeaturesState(updatedFeatures);
+    }
+  }, [variantJson, activeFeatures.length, logger]);
 
   // Set feature clusters
   const setFeatureClusters = useCallback((clusters: FeatureCluster[]) => {
@@ -89,7 +126,7 @@ export function FeatureActivationProvider({ children }: FeatureActivationProvide
     }
   }, [activeFeatures, logger, variantId]);
 
-  // Utility to get activation value for a specific feature
+  // Utility to get base activation value for a specific feature
   const getFeatureActivation = useCallback((featureLabel: string): number | undefined => {
     const feature = activeFeatures.find(f => f.label === featureLabel);
     return feature?.activation;

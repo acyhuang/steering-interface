@@ -11,11 +11,10 @@ import {
   FeatureCluster
 } from "@/types/features"
 import { featuresApi } from "@/lib/api"
-import { useFeatureCardVariant } from './feature-card'
-import { useFeatureListVariant } from './feature-list'
 import { useLogger } from '@/lib/logger'
 import { useFeatureActivations } from '@/contexts/FeatureActivationContext'
 import { useVariant } from '@/contexts/VariantContext'
+import { FeatureTable, FeatureEditor } from './feature-row'
 
 interface ControlsProps {
   variantId?: string;
@@ -46,8 +45,8 @@ export function Controls({ variantId = "default" }: ControlsProps) {
   const [isSearching, setIsSearching] = useState(false)
   const refreshInProgressRef = useRef(false);
   
-  const FeatureCardVariant = useFeatureCardVariant();
-  const FeatureListVariant = useFeatureListVariant();
+  // New state for selected feature
+  const [selectedFeature, setSelectedFeature] = useState<FeatureActivation | null>(null);
 
   // Process variantJson into modifiedFeatures when it changes
   useEffect(() => {
@@ -59,7 +58,8 @@ export function Controls({ variantId = "default" }: ControlsProps) {
         if (variantJson && Array.isArray(variantJson.edits)) {
           const features: FeatureActivation[] = variantJson.edits.map((edit: FeatureEdit) => ({
             label: edit.feature_label,
-            activation: typeof edit.value === 'number' ? edit.value : 0
+            activation: 0, // Base activation is not relevant here
+            modifiedActivation: typeof edit.value === 'number' ? edit.value : 0
           }));
           setModifiedFeatures(features);
         } else {
@@ -86,44 +86,63 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     };
 
     fetchData();
-  }, [selectedTab]); // Deliberately exclude refreshVariant to prevent infinite loops
+  }, [selectedTab, refreshVariant]);
+
+  // Clear selected feature when switching tabs
+  useEffect(() => {
+    setSelectedFeature(null);
+  }, [selectedTab]);
+
+  const handleSelectFeature = (feature: FeatureActivation) => {
+    setSelectedFeature(prevSelected => {
+      // If already selected, deselect it
+      if (prevSelected?.label === feature.label) {
+        return null;
+      }
+      return feature;
+    });
+  };
+
+  const handleCloseEditor = () => {
+    setSelectedFeature(null);
+  };
 
   const handleSteer = async (response: SteerFeatureResponse) => {
     logger.debug('Handling steer response', { response });
     
-    const steerRequest = {
-      session_id: "default_session",
-      variant_id: variantId,
-      feature_label: response.label,
-      value: response.activation
-    };
-    logger.debug('Making steer request', { request: steerRequest });
+    // Update the feature in the appropriate list based on the current tab
+    if (selectedTab === "search") {
+      // For search results, we need to update the local state
+      setSearchResults(prev => 
+        prev.map(f => {
+          if (f.label === response.label) {
+            return { 
+              ...f, 
+              modifiedActivation: response.activation 
+            };
+          }
+          return f;
+        })
+      );
+    } else if (selectedTab === "modified") {
+      // For modified tab, refresh the variant data
+      refreshInProgressRef.current = true;
+      await refreshVariant();
+    }
     
-    try {
-      // Make the actual API call to steer the feature
-      await featuresApi.steerFeature(steerRequest);
-      logger.debug('Feature steering successful', { 
-        feature: response.label, 
-        value: response.activation 
+    // Update the selected feature state if needed
+    if (selectedFeature && selectedFeature.label === response.label) {
+      setSelectedFeature({
+        ...selectedFeature,
+        modifiedActivation: response.activation
       });
-      
-      if (selectedTab === "modified") {
-        logger.debug('On modified tab, refreshing variant data');
-        refreshInProgressRef.current = true;
-        await refreshVariant();
-      }
+    }
 
-      // Regenerate the last message after steering
+    // Regenerate the last message after steering
+    // @ts-ignore
+    if (window.regenerateLastMessage) {
       // @ts-ignore
-      if (window.regenerateLastMessage) {
-        // @ts-ignore
-        await window.regenerateLastMessage();
-      }
-    } catch (error) {
-      logger.error('Failed to steer feature', { 
-        error: error instanceof Error ? error.message : String(error),
-        feature: response.label
-      });
+      await window.regenerateLastMessage();
     }
   }
 
@@ -141,8 +160,14 @@ export function Controls({ variantId = "default" }: ControlsProps) {
         top_k: 10
       });
       
-      logger.debug("Search results", { results });
-      setSearchResults(results);
+      // Initialize with modifiedActivation = 0
+      const resultsWithModified = results.map(feature => ({
+        ...feature,
+        modifiedActivation: 0
+      }));
+      
+      logger.debug("Search results", { results: resultsWithModified });
+      setSearchResults(resultsWithModified);
     } catch (error) {
       logger.error("Error searching features", { error });
       setSearchResults([]);
@@ -165,11 +190,35 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     }
 
     return (
-      <FeatureListVariant
+      <FeatureTable
         features={activeFeatures}
         clusters={featureClusters}
+        selectedFeature={selectedFeature}
+        onSelectFeature={handleSelectFeature}
         onSteer={handleSteer}
-        variantId={variantId}
+      />
+    );
+  };
+
+  const renderModifiedFeatures = () => {
+    if (isLoadingModified) {
+      return <div className="text-sm text-gray-500">Loading variant state...</div>;
+    }
+
+    if (!modifiedFeatures || modifiedFeatures.length === 0) {
+      return (
+        <div className="text-sm text-gray-500">
+          No modified features.
+        </div>
+      );
+    }
+
+    return (
+      <FeatureTable
+        features={modifiedFeatures}
+        selectedFeature={selectedFeature}
+        onSelectFeature={handleSelectFeature}
+        onSteer={handleSteer}
       />
     );
   };
@@ -180,16 +229,12 @@ export function Controls({ variantId = "default" }: ControlsProps) {
         {isSearching ? (
           <div className="text-sm text-gray-500">Searching...</div>
         ) : searchResults.length > 0 ? (
-          <div className="space-y-2">
-            {searchResults.map((feature, index) => (
-              <FeatureCardVariant
-                key={index}
-                feature={feature}
-                onSteer={handleSteer}
-                variantId={variantId}
-              />
-            ))}
-          </div>
+          <FeatureTable
+            features={searchResults}
+            selectedFeature={selectedFeature}
+            onSelectFeature={handleSelectFeature}
+            onSteer={handleSteer}
+          />
         ) : searchQuery ? (
           <div className="text-sm text-gray-500">
             Press Enter or click Search to find features
@@ -223,6 +268,12 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     );
   };
 
+  // Calculate the scroll area height based on whether the editor is visible
+  // When editor is visible, we reduce the height to make room for it
+  const scrollAreaHeight = selectedFeature 
+    ? "calc(100vh - 400px)" // Reduced height when editor is visible
+    : "calc(100vh - 280px)"; // Original height
+
   return (
     <Card className="h-full p-4">
       <div className="flex flex-col h-full gap-4">
@@ -242,25 +293,14 @@ export function Controls({ variantId = "default" }: ControlsProps) {
             <TabsTrigger value="search">Search</TabsTrigger>
           </TabsList>
 
-          <div className="flex-1 min-h-0 mt-4">
-            <ScrollArea className="h-[calc(100vh-280px)]">
+          <div className="flex-1 min-h-0 mt-4 flex flex-col">
+            <ScrollArea className="flex-1" style={{ height: scrollAreaHeight, transition: "height 0.2s ease" }}>
               <TabsContent value="activated" className="m-0">
                 {renderActivatedFeatures()}
               </TabsContent>
 
               <TabsContent value="modified" className="m-0">
-                {isLoadingModified ? (
-                  <div className="text-sm text-gray-500">Loading variant state...</div>
-                ) : (
-                  <div className="space-y-2 pr-4">
-                    <div className="p-2 bg-gray-100 rounded text-xs font-mono">
-                      <div className="font-semibold mb-2">Raw variantJson:</div>
-                      <pre className="whitespace-pre-wrap overflow-auto">
-                        {JSON.stringify(variantJson, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-                )}
+                {renderModifiedFeatures()}
               </TabsContent>
 
               <TabsContent value="search" className="m-0">
@@ -270,6 +310,15 @@ export function Controls({ variantId = "default" }: ControlsProps) {
                 </div>
               </TabsContent>
             </ScrollArea>
+
+            {/* Feature Editor now positioned below the scroll area */}
+            {selectedFeature && (
+              <FeatureEditor
+                feature={selectedFeature}
+                onSteer={handleSteer}
+                onClose={handleCloseEditor}
+              />
+            )}
           </div>
         </Tabs>
       </div>
