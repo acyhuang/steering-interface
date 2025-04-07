@@ -110,13 +110,13 @@ export function FeatureEditor({
   const currentValue = feature.modifiedActivation !== undefined ? feature.modifiedActivation : 0;
 
   return (
-    <div className="pt-2 mt-2 border-t bg-background">
-      <div className="space-y-4">
+    <div className="pt-2 mt-1 border-t bg-background">
+      <div className="space-y-2">
         <div className="flex justify-between items-start">
           <div>
             <h3 className="font-medium">{feature.label}</h3>
               <div className="text-xs text-gray-500">
-                Activation: {(feature.modifiedActivation ?? 0).toFixed(2)}
+                Activation: {(feature.modifiedActivation ?? 0).toFixed(1)}
               </div>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
@@ -124,7 +124,7 @@ export function FeatureEditor({
           </Button>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1">
           <div className="flex justify-between text-xs text-gray-500">
             <span>-0.8</span>
             <span>-0.4</span>

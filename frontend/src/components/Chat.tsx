@@ -170,13 +170,13 @@ export function Chat({ onVariantChange }: ChatProps) {
   }, [messages]);
 
   return (
-    <Card className="flex flex-col h-full">
+    <div className="flex flex-col h-full border-0">
       <div className="p-2 border-b bg-muted/50">
         <div className="text-sm text-muted-foreground space-y-1">
           <div>Current Variant: <span className="font-medium">{variantId}</span></div>
         </div>
       </div>
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-2">
         <div className="space-y-4">
           {messages.map((message, index) => (
             <div
@@ -203,7 +203,7 @@ export function Chat({ onVariantChange }: ChatProps) {
           )}
         </div>
       </ScrollArea>
-      <div className="p-4 border-t">
+      <div className="p-2 border-t">
         <div className="flex gap-2 items-end">
           <Textarea
             ref={textareaRef}
@@ -225,6 +225,6 @@ export function Chat({ onVariantChange }: ChatProps) {
           </Button>
         </div>
       </div>
-    </Card>
+    </div>
   );
 } 

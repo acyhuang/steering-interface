@@ -42,9 +42,9 @@ export function FeatureTable({
   // If clusters are provided, render in clustered view
   if (clusters && clusters.length > 0) {
     return (
-      <div className="space-y-1">
+      <div>
         {clusters.map((cluster) => (
-          <div key={cluster.name} className="border rounded-md overflow-hidden">
+          <div key={cluster.name} className="border overflow-hidden">
             <div 
               className="flex items-center p-2 bg-gray-50 cursor-pointer"
               onClick={() => toggleCluster(cluster.name)}
@@ -80,7 +80,7 @@ export function FeatureTable({
 
   // Otherwise render flat list
   return (
-    <div className="border rounded-md overflow-hidden divide-y divide-gray-100">
+    <div className="border overflow-hidden divide-y divide-gray-100">
       {features.map((feature) => (
         <FeatureRow
           key={feature.label}

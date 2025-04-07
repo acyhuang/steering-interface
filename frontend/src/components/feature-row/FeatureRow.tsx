@@ -26,7 +26,7 @@ export function FeatureRow({
     >
       <div className="text-sm">{feature.label}</div>
       <div className={`text-sm ${displayValue !== 0 ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
-        {displayValue.toFixed(2)}
+        {displayValue.toFixed(1)}
       </div>
     </div>
   );

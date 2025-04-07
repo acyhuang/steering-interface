@@ -225,7 +225,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
 
   const renderSearchContent = () => {
     return (
-      <div className="flex flex-col gap-4 pr-2">
+      <div className="flex flex-col gap-4 pr-0">
         {isSearching ? (
           <div className="text-sm text-gray-500">Searching...</div>
         ) : searchResults.length > 0 ? (
@@ -250,7 +250,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
 
   const renderSearchBar = () => {
     return (
-      <div className="flex gap-2 px-1 pt-1 pb-3 sticky top-0 bg-white border-b z-10">
+      <div className="flex gap-2 px-0 pt-1 pb-2 sticky top-0 bg-white border-b z-10">
         <Input
           placeholder="Search features..."
           value={searchQuery}
@@ -275,9 +275,9 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     : "calc(100vh - 280px)"; // Original height
 
   return (
-    <Card className="h-full p-4">
-      <div className="flex flex-col h-full gap-4">
-        <div className="flex flex-col gap-2">
+    <div className="h-full p-2">
+      <div className="flex flex-col h-full gap-2">
+        <div className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold">Steering Controls</h2>
         </div>
 
@@ -293,7 +293,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
             <TabsTrigger value="search">Search</TabsTrigger>
           </TabsList>
 
-          <div className="flex-1 min-h-0 mt-4 flex flex-col">
+          <div className="flex-1 min-h-0 mt-2 flex flex-col">
             <ScrollArea className="flex-1" style={{ height: scrollAreaHeight, transition: "height 0.2s ease" }}>
               <TabsContent value="activated" className="m-0">
                 {renderActivatedFeatures()}
@@ -305,7 +305,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
 
               <TabsContent value="search" className="m-0">
                 {renderSearchBar()}
-                <div className="px-1 pt-2">
+                <div className="px-0 pt-2">
                   {renderSearchContent()}
                 </div>
               </TabsContent>
@@ -322,6 +322,6 @@ export function Controls({ variantId = "default" }: ControlsProps) {
           </div>
         </Tabs>
       </div>
-    </Card>
+    </div>
   );
 } 

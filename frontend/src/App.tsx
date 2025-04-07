@@ -39,17 +39,17 @@ function App() {
       <FeatureActivationProvider>
         <TestBenchProvider>
           <div className="h-screen flex flex-col">
-            <div className="p-4 flex justify-between items-center">
+            <div className="p-2 flex justify-between items-center border-b">
               <TestBenchPanel />
               <ConnectionStatus />
             </div>
             <Split 
-              className="flex-1 flex gap-4 p-4 overflow-hidden split"
+              className="flex-1 flex overflow-hidden split"
               sizes={sizes}
               minSize={[400, 400]} 
               onDragEnd={setSizes}
               gutterStyle={() => ({
-                backgroundColor: '#e5e7eb', // light gray
+                backgroundColor: 'hsl(var(--border))',
                 width: '4px',
                 cursor: 'col-resize'
               })}
