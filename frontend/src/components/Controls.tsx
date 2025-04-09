@@ -250,7 +250,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
 
   const renderSearchBar = () => {
     return (
-      <div className="flex gap-2 px-0 pt-1 pb-2 sticky top-0 bg-white border-b z-10">
+      <div className="flex gap-2 px-1 pt-1 pb-2 sticky top-0 bg-white z-10">
         <Input
           placeholder="Search features..."
           value={searchQuery}

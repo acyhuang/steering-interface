@@ -42,26 +42,28 @@ export function FeatureTable({
   // If clusters are provided, render in clustered view
   if (clusters && clusters.length > 0) {
     return (
-      <div>
+      <div className="space-y-1">
         {clusters.map((cluster) => (
-          <div key={cluster.name} className="border overflow-hidden">
+          <div key={cluster.name} className="mb-2">
             <div 
-              className="flex items-center p-2 bg-gray-50 cursor-pointer"
+              className="flex items-center justify-between p-2 bg-gray-50 hover:bg-gray-100 cursor-pointer rounded-md"
               onClick={() => toggleCluster(cluster.name)}
             >
-              {expandedClusters[cluster.name] ? (
-                <ChevronDown className="h-4 w-4 mr-2" />
-              ) : (
-                <ChevronRight className="h-4 w-4 mr-2" />
-              )}
-              <div className="font-medium">{cluster.name}</div>
-              <div className="ml-2 text-xs text-gray-500">
-                ({cluster.features.length})
+              <div className="text-xs uppercase font-medium text-gray-500">{cluster.name}</div>
+              <div className="flex items-center">
+                <div className="text-xs text-gray-400 mr-1">
+                  {cluster.features.length}
+                </div>
+                {expandedClusters[cluster.name] ? (
+                  <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+                )}
               </div>
             </div>
             
             {expandedClusters[cluster.name] && (
-              <div className="border-t divide-y divide-gray-100">
+              <div className="mt-1 space-y-0.5">
                 {cluster.features.map((feature) => (
                   <FeatureRow
                     key={feature.label}
@@ -80,7 +82,7 @@ export function FeatureTable({
 
   // Otherwise render flat list
   return (
-    <div className="border overflow-hidden divide-y divide-gray-100">
+    <div className="space-y-0.5">
       {features.map((feature) => (
         <FeatureRow
           key={feature.label}

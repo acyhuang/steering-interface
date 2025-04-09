@@ -18,9 +18,9 @@ export function FeatureRow({
 
   return (
     <div 
-      className={`flex justify-between items-center p-2 hover:bg-gray-50 cursor-pointer ${
+      className={`flex justify-between items-center p-2 hover:bg-gray-100 cursor-pointer rounded-md ${
         isSelected ? 'bg-blue-50' : ''
-      }`}
+      } gap-4`}
       onClick={() => onSelect(feature)}
       data-feature-id={feature.label}
     >

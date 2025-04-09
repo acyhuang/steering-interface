@@ -131,7 +131,7 @@ export function FeatureEditor({
 
   return (
     <div className="pt-2 mt-1 border-t bg-background">
-      <div className="space-y-2">
+      <div className="space-y-3 px-2">
         <div className="flex justify-between items-start">
           <div>
             <h3 className="font-medium">{feature.label}</h3>
@@ -139,7 +139,7 @@ export function FeatureEditor({
                 Activation: {(feature.modifiedActivation ?? 0).toFixed(1)}
               </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={onClose} className="p-1 h-auto">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -166,6 +166,7 @@ export function FeatureEditor({
           <Button 
             onClick={handleSteer} 
             disabled={isLoading || sliderValue[0] === currentValue}
+            size="sm"
           >
             {isLoading ? "Applying..." : "Apply"}
           </Button>
