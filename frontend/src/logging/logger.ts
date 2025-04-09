@@ -8,7 +8,7 @@ const getCurrentLogLevel = (): LogLevel => {
     case 'staging':
       return LogLevel.DEBUG;
     default:
-      return LogLevel.INFO;
+      return LogLevel.DEBUG;
   }
 };
 

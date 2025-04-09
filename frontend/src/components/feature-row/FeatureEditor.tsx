@@ -9,6 +9,13 @@ import { X } from "lucide-react";
 
 const logger = createLogger('FeatureEditor');
 
+// Declare the global window interface for regenerateLastMessage
+declare global {
+  interface Window {
+    regenerateLastMessage: () => Promise<void>;
+  }
+}
+
 // Discrete values for the slider
 const DISCRETE_VALUES = [-0.8, -0.4, 0, 0.4, 0.8];
 
@@ -23,7 +30,7 @@ export function FeatureEditor({
   onSteer,
   onClose
 }: FeatureEditorProps) {
-  const { variantId } = useVariant();
+  const { variantId, applyPendingFeatures } = useVariant();
   const [isLoading, setIsLoading] = useState(false);
   
   // Initialize slider with modifiedActivation or 0
@@ -62,6 +69,13 @@ export function FeatureEditor({
     try {
       const steeringValue = sliderValue[0];
 
+      // First, apply the feature as a pending feature in VariantContext
+      await applyPendingFeatures(feature.label, steeringValue);
+      logger.debug('Applied pending feature for comparison', { 
+        feature: feature.label, 
+        value: steeringValue 
+      });
+
       // If the slider is at 0, clear the feature
       if (steeringValue === 0) {
         const response = await featuresApi.clearFeature({
@@ -70,7 +84,7 @@ export function FeatureEditor({
           feature_label: feature.label
         });
 
-        logger.debug('Feature cleared', { feature: feature.label });
+        logger.debug('Feature cleared from the backend', { feature: feature.label });
         
         if (onSteer) {
           onSteer({ 
@@ -80,7 +94,7 @@ export function FeatureEditor({
           });
         }
       } else {
-        // Otherwise apply the new value
+        // Otherwise apply the new value to the backend
         const response = await featuresApi.steerFeature({
           session_id: "default_session",
           variant_id: variantId,
@@ -88,7 +102,7 @@ export function FeatureEditor({
           value: steeringValue
         });
 
-        logger.debug('Feature steered', { 
+        logger.debug('Feature steered in the backend', { 
           feature: feature.label, 
           value: steeringValue 
         });
@@ -96,6 +110,12 @@ export function FeatureEditor({
         if (onSteer) {
           onSteer(response);
         }
+      }
+
+      // Trigger regeneration to get the steered response
+      if (window.regenerateLastMessage) {
+        logger.debug('Triggering regeneration for comparison');
+        await window.regenerateLastMessage();
       }
     } catch (error) {
       logger.error('Failed to modify feature:', { 
@@ -134,8 +154,8 @@ export function FeatureEditor({
           </div>
           <Slider 
             value={sliderValue}
-            min={-1}
-            max={1}
+            min={-0.8}
+            max={0.8}
             step={0.05}
             onValueChange={handleValueChange}
             disabled={isLoading}

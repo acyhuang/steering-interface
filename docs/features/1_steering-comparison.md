@@ -24,6 +24,8 @@ This feature allows users to compare the effects of different steering actions o
    - If the original response has already been generated, we should use that response for the comparison (don't generate a new response)
    - Only the text content of responses is compared
    - Responses are displayed using the existing rendering system
+   - Responses will be stored in the VariantContext state
+   - Format will match existing response handling in the chat interface (HTML/markdown)
 
 3. Steering Flow and Multiple Features
    - Each new steering action compares against the original response
@@ -43,18 +45,39 @@ This feature allows users to compare the effects of different steering actions o
      - All pending steering changes are reverted to the last confirmed state
      - All PENDING features are cleared
 
-4. State Management
-   - Variant state is managed using the SDK's built-in Variant class
+4. State Management and Context Integration
+   - State will be managed by extending the existing VariantContext
+   - The extended VariantContext will include:
+     ```typescript
+     // New properties
+     pendingFeatures: Map<string, number>; // feature_label -> value
+     lastConfirmedState: any | null;
+     originalResponse: string | null;
+     steeredResponse: string | null;
+     isGeneratingSteeredResponse: boolean;
+     generationError: Error | null;
+     
+     // New methods
+     applyPendingFeatures: (featureLabel: string, value: number) => Promise<void>;
+     confirmSteeredResponse: () => Promise<void>;
+     cancelSteering: () => void;
+     generateSteeredResponse: () => Promise<void>;
+     ```
    - A single primary variant instance is maintained per session
    - Pending changes are tracked separately from confirmed changes
-   - System maintains three key pieces of state:
+   - System maintains key pieces of state:
      a. Current variant (SDK Variant instance with all changes)
      b. Pending features map (feature_label -> value)
      c. Last confirmed state (JSON serialized variant)
+     d. Original response content (for comparison)
+     e. Steered response content (for comparison)
    - State transitions:
      - When applying pending changes: Update both variant and pending features map
      - When confirming changes: Clear pending features map and save variant as confirmed state
      - When canceling changes: Restore variant from last confirmed state and clear pending map
+   - Coordination with FeatureActivationContext:
+     - Update UI sliders to reflect pending state
+     - Visualize which features have pending changes
 
    Additional Behaviors:
    - Initial State:
@@ -74,6 +97,15 @@ This feature allows users to compare the effects of different steering actions o
      - User can retry generation or cancel changes
      - Error state is displayed in comparison view
 
+5. UI Components
+   - ComparisonView: Split view component to display original and steered responses, which the user can choose between
+   - GenerationIndicator: Loading state visualization for in-progress generations
+   - ErrorDisplay: Component for visualizing generation errors
+
+6. Chat Flow Integration
+   - Comparison view appears in place of the most recent message
+   - Upon confirmation, the comparison view is replaced with the selected message
+   - Comparisons are not stored in chat history, only the final selected response
 
 ### API Trigger Flow
 ```mermaid
@@ -108,3 +140,24 @@ sequenceDiagram
         F->>F: Clear comparison state
     end
 ```
+
+## Implementation Plan
+
+1. Extend VariantContext
+   - Add state for pending features, responses, and generation status
+   - Implement methods for applying, confirming, and canceling steers
+
+2. Create UI Components
+   - Develop ComparisonView component
+   - Implement steering confirmation controls
+   - Add visual indicators for pending features
+
+3. Integration
+   - Connect feature activation UI with pending state
+   - Integrate comparison view into chat interface
+   - Handle response generation and cancellation
+
+4. Testing
+   - Test concurrent operations and race conditions
+   - Verify error handling and recovery
+   - Ensure state consistency across operations
