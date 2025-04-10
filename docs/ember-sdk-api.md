@@ -177,6 +177,10 @@ POST /features/steer
 **SDK Methods Used:**
 - `variant.set()`
 
+**Frontend Integration:**
+- Used with the comparison workflow to preview changes
+- VariantContext tracks these changes as pending until confirmed
+
 #### Inspect Features
 Analyzes feature activations in the current conversation.
 
@@ -362,3 +366,24 @@ Standard HTTP status codes are used along with error responses:
 Common SDK exceptions handled:
 - `InferenceAbortedException` - When safety filters abort generation
 - `RateLimitExceeded` - When API rate limits are hit 
+
+## Steering Comparison Workflow
+
+The steering comparison workflow leverages existing API endpoints but implements a two-step confirmation process on the frontend:
+
+1. **Apply Pending Changes**
+   - Frontend stores pending feature modifications in VariantContext
+   - Backend endpoints (steer/clear) are called with these pending values
+   - Original response is preserved for comparison
+
+2. **Generate Comparison**
+   - System generates a new response using the pending feature changes
+   - Both original and steered responses are displayed side-by-side
+   - User selects their preferred response
+
+3. **Confirm or Cancel Changes**
+   - If steered response is selected: pending changes become permanent
+   - If original response is selected: pending changes are reverted
+   - The selected response becomes the new current response
+
+This approach allows users to see the direct impact of steering modifications before committing to them, building intuition for how features influence model outputs. 

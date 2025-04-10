@@ -43,29 +43,34 @@ sequenceDiagram
     FI-->>CI: Show Feature Activations
 ```
 
-#### Steering Flow
+#### Steering Comparison Flow
 ```mermaid
 sequenceDiagram
     participant U as User
     participant CI as Chat.tsx
-    participant IP as Inspector.tsx
+    participant VC as VariantContext
+    participant CV as ComparisonView
     participant FS as /features/steer 
-    participant FC as /features/clear
-    participant FM as /features/modified 
     participant CC as /chat/completions
     
-    U->>IP: Adjust/Clear Feature
-    alt Adjust Feature
-        IP->>FS: POST Request
-        FS->>FM: GET Request
-        FM-->>FS: Current State
-    else Clear Feature
-        IP->>FC: POST Request
-        FC->>FM: GET Request
-        FM-->>FC: Current State
+    U->>CI: Adjust Feature
+    CI->>VC: applyPendingFeatures()
+    VC->>FS: Apply steering as pending
+    FS-->>VC: Update pending state
+    VC->>CC: Generate steered response
+    CC-->>VC: Return steered response
+    VC->>CV: Display comparison view
+    CV-->>U: Show original vs steered
+    
+    alt User Selects Steered Response
+        U->>CV: Confirms steered version
+        CV->>VC: confirmSteeredResponse()
+        VC->>VC: Apply pending features permanently
+    else User Rejects Steered Response
+        U->>CV: Selects original version
+        CV->>VC: cancelSteering()
+        VC->>VC: Revert to original state
     end
-    IP->>CC: Trigger Regeneration
-    CC-->>CI: New Completion
 ```
 
 #### Feature Search Flow
@@ -123,6 +128,13 @@ The application uses several context providers to manage different aspects of ap
 - Provides functions to set, clear, and retrieve feature modifications
 - Implemented in `frontend/src/contexts/FeatureContext.tsx`
 
+**VariantContext:**
+- Manages variant state and steering comparison workflow
+- Tracks pending and confirmed feature changes
+- Maintains original and steered responses for comparison
+- Provides methods for applying, confirming, and canceling steering actions
+- Implemented in `frontend/src/contexts/VariantContext.tsx`
+
 **TestBenchProvider:**
 - Manages component testing configurations
 - Tracks active tests and test definitions
@@ -136,12 +148,16 @@ The application's state flow follows a clear hierarchy:
 ```mermaid
 graph TD
     A[App Component] --> B[FeatureProvider]
-    B --> C[TestBenchProvider]
+    B --> V[VariantProvider]
+    V --> C[TestBenchProvider]
     C --> D[Component Tree]
     D --> E[Chat Component]
     D --> F[Controls Component]
+    D --> G[ComparisonView Component]
     E -- "Messages Update" --> A
-    F -- "Feature Steering" --> B
+    F -- "Feature Adjustment" --> V
+    V -- "Response Comparison" --> G
+    G -- "Confirmation/Rejection" --> V
 ```
 
 **State Access Pattern:**

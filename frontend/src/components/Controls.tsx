@@ -3,8 +3,15 @@ import { Card } from "./ui/card"
 import { ScrollArea } from "./ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
 import { useState, useEffect, useRef } from "react"
-import { Search } from "lucide-react"
+import { Search, HelpCircle } from "lucide-react"
 import { Button } from "./ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog"
 import { 
   FeatureActivation, 
   SteerFeatureResponse, 
@@ -47,6 +54,9 @@ export function Controls({ variantId = "default" }: ControlsProps) {
   
   // New state for selected feature
   const [selectedFeature, setSelectedFeature] = useState<FeatureActivation | null>(null);
+  
+  // State for help dialog
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
 
   // Process variantJson into modifiedFeatures when it changes
   useEffect(() => {
@@ -184,7 +194,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     if (!activeFeatures || activeFeatures.length === 0) {
       return (
         <div className="text-sm text-gray-500">
-          No activated features. Start a conversation to see features in use.
+          Activated features are features are influencing the model's responses. Start a conversation to see activated features.
         </div>
       );
     }
@@ -277,8 +287,34 @@ export function Controls({ variantId = "default" }: ControlsProps) {
   return (
     <div className="h-full p-2">
       <div className="flex flex-col h-full gap-2">
-        <div className="flex flex-col gap-1">
+        <div className="flex justify-between items-center gap-1">
           <h2 className="text-lg font-semibold">Steering Controls</h2>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setHelpDialogOpen(true)}
+            className="rounded-full" 
+            aria-label="Help"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </Button>
+          
+          <Dialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Understanding steering controls</DialogTitle>
+                <DialogDescription>
+                  <div className="mt-4 space-y-4 text-sm">
+                    <p>Features are internal representations of concepts that the LLM has learned. Steering controls allow you to strengthen or weaken features in the model to influence its behavior.</p>
+                    <p><span className="font-medium">Activated:</span> Features that are currently influencing the model's outputs in your conversation.</p>
+                    <p><span className="font-medium">Modified:</span> Features that have been strengthened or weakened from the model's default state.</p>
+                    <p><span className="font-medium">Search:</span> Allows you to find features by their meaning or purpose.</p>
+                  
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <Tabs 
@@ -295,7 +331,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
 
           <div className="flex-1 min-h-0 mt-2 flex flex-col">
             <ScrollArea className="flex-1" style={{ height: scrollAreaHeight, transition: "height 0.2s ease" }}>
-              <TabsContent value="activated" className="m-0">
+              <TabsContent value="activated" className="m-0 pr-2">
                 {renderActivatedFeatures()}
               </TabsContent>
 

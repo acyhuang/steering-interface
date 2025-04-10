@@ -1,4 +1,4 @@
-# Components Documentation
+# Components
 
 Features marked with [TODO] are planned for future implementation.
 
@@ -17,10 +17,11 @@ Features marked with [TODO] are planned for future implementation.
   1. Activated
      - Displays current feature activations
      - Shows clustered and unclustered feature views
-     - Allows real-time feature steering
+     - Allows real-time feature steering with comparison
   2. Modified
      - Displays currently modified features
      - Shows current variant state
+     - Indicates pending vs. confirmed modifications
   3. Search
      - Provides semantic search for features
      - Displays search results with steering controls
@@ -43,3 +44,17 @@ Features marked with [TODO] are planned for future implementation.
 - Displays system connectivity state
 - Shows real-time API connection health
 - Updates status every 5 seconds
+
+### ComparisonView Component
+- Displays side-by-side comparison of original and steered responses
+- Provides UI for selecting preferred response
+- Shows loading and error states during generation
+- Facilitates the two-step confirmation process for steering
+- Integrated with VariantContext for state management
+
+### Feature Editor Component
+- Extends Feature Card with enhanced steering capabilities
+- Maintains pending state for feature modifications
+- Integrates with VariantContext for managing pending features
+- Supports discrete feature value selection with slider
+- Provides visual feedback for pending vs. confirmed states
