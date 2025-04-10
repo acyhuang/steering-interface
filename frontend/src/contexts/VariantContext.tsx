@@ -25,7 +25,7 @@ interface VariantContextType {
   
   // New methods for steering comparison
   applyPendingFeatures: (featureLabel: string, value: number) => Promise<void>;
-  confirmSteeredResponse: () => Promise<void>;
+  confirmSteeredResponse: (onConfirmed?: () => Promise<void>) => Promise<void>;
   cancelSteering: () => void;
   generateSteeredResponse: (messages: ChatMessage[]) => Promise<void>;
   hasPendingFeatures: () => boolean;
@@ -177,7 +177,7 @@ export function VariantProvider({
   /**
    * Confirms the steered response and finalizes pending feature changes
    */
-  const confirmSteeredResponse = useCallback(async () => {
+  const confirmSteeredResponse = useCallback(async (onConfirmed?: () => Promise<void>) => {
     try {
       logger.debug('Confirming steered response', { 
         pendingFeatureCount: pendingFeatures.size 
@@ -209,6 +209,11 @@ export function VariantProvider({
       setIsComparingResponses(false);
       
       logger.debug('Steered response confirmed');
+      
+      // Call the callback if provided
+      if (onConfirmed) {
+        await onConfirmed();
+      }
       
     } catch (error) {
       logger.error('Failed to confirm steered response', { error });

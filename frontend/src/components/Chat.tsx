@@ -231,6 +231,12 @@ export function Chat({ onVariantChange }: ChatProps) {
     }
   }, [regenerateLastMessage]);
 
+  // Create a callback for feature refresh
+  const refreshFeaturesCallback = useCallback(async () => {
+    logger.debug('Refreshing activated features after steering confirmed');
+    return processFeatures(messages);
+  }, [messages]);
+
   return (
     <div className="flex flex-col h-full border-0">
       <div className="p-2 border-b bg-muted/50">
@@ -275,7 +281,10 @@ export function Chat({ onVariantChange }: ChatProps) {
           {/* Comparison View */}
           {isComparingResponses && (
             <div className="w-full">
-              <ComparisonView className="mt-4" />
+              <ComparisonView 
+                className="mt-4" 
+                refreshFeatures={refreshFeaturesCallback} 
+              />
             </div>
           )}
         </div>

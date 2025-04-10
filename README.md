@@ -3,6 +3,7 @@
 **TODO (next actions):** 
 - side-by-side add summary of differences
 - fix autosteer, allow toggle on/off?
+- pending features don't update 
 
 **SMALL FIXES:**
 - add tests to variantcontext.test.tsx to test that isComparing state is correct

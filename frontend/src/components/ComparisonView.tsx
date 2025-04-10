@@ -6,9 +6,10 @@ import { createLogger } from '@/lib/logger';
 
 interface ComparisonViewProps {
   className?: string;
+  refreshFeatures?: () => Promise<void>;
 }
 
-export function ComparisonView({ className }: ComparisonViewProps) {
+export function ComparisonView({ className, refreshFeatures }: ComparisonViewProps) {
   const logger = createLogger('ComparisonView');
   const {
     originalResponse,
@@ -26,7 +27,7 @@ export function ComparisonView({ className }: ComparisonViewProps) {
 
   const handleSelectSteered = () => {
     logger.debug('User selected steered response');
-    confirmSteeredResponse();
+    confirmSteeredResponse(refreshFeatures);
   };
 
   if (isGeneratingSteeredResponse) {
