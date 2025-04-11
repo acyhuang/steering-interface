@@ -1,4 +1,5 @@
 import { FeatureActivation } from "@/types/features"
+import { useVariant } from "@/contexts/VariantContext";
 
 interface FeatureRowProps {
   feature: FeatureActivation;
@@ -11,10 +12,13 @@ export function FeatureRow({
   isSelected,
   onSelect
 }: FeatureRowProps) {
-  // Use modifiedActivation with a fallback to 0
-  const displayValue = feature.modifiedActivation !== undefined 
-    ? feature.modifiedActivation 
-    : 0;
+  const { getFeatureModification } = useVariant();
+  
+  // Get modification value from context or fall back to feature's value or 0
+  const modificationValue = getFeatureModification(feature.label);
+  const displayValue = modificationValue !== null 
+    ? modificationValue 
+    : (feature.modifiedActivation !== undefined ? feature.modifiedActivation : 0);
 
   return (
     <div 

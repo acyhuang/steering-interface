@@ -43,9 +43,15 @@ interface VariantResponse {
 export function Controls({ variantId = "default" }: ControlsProps) {
   const logger = useLogger('Controls')
   const { activeFeatures, featureClusters, isLoading } = useFeatureActivations();
-  const { variantJson, refreshVariant } = useVariant();
+  const { 
+    variantJson, 
+    refreshVariant, 
+    modifiedFeatures, 
+    getAllModifiedFeatures 
+  } = useVariant();
+  
   const [searchQuery, setSearchQuery] = useState("")
-  const [modifiedFeatures, setModifiedFeatures] = useState<FeatureActivation[]>([])
+  const [localModifiedFeatures, setLocalModifiedFeatures] = useState<FeatureActivation[]>([])
   const [isLoadingModified, setIsLoadingModified] = useState(false)
   const [selectedTab, setSelectedTab] = useState("activated")
   const [searchResults, setSearchResults] = useState<FeatureActivation[]>([])
@@ -58,32 +64,35 @@ export function Controls({ variantId = "default" }: ControlsProps) {
   // State for help dialog
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
 
-  // Process variantJson into modifiedFeatures when it changes
+  // Process modifiedFeatures from context to local state
   useEffect(() => {
-    if (variantJson) {
-      setIsLoadingModified(true);
-      
-      try {
-        // Transform variant JSON into FeatureActivation format
-        if (variantJson && Array.isArray(variantJson.edits)) {
-          const features: FeatureActivation[] = variantJson.edits.map((edit: FeatureEdit) => ({
-            label: edit.feature_label,
+    setIsLoadingModified(true);
+    
+    try {
+      const allModifiedFeatures = getAllModifiedFeatures();
+      if (allModifiedFeatures.size > 0) {
+        // Convert Map to FeatureActivation array
+        const features: FeatureActivation[] = Array.from(allModifiedFeatures.entries())
+          .map(([label, value]) => ({
+            label,
             activation: 0, // Base activation is not relevant here
-            modifiedActivation: typeof edit.value === 'number' ? edit.value : 0
+            modifiedActivation: value
           }));
-          setModifiedFeatures(features);
-        } else {
-          setModifiedFeatures([]);
-        }
-      } catch (error) {
-        logger.error('Failed to process variant JSON', { error });
-        setModifiedFeatures([]);
-      } finally {
-        setIsLoadingModified(false);
-        refreshInProgressRef.current = false;
+        setLocalModifiedFeatures(features);
+        logger.debug('Updated local modified features from context', { 
+          featureCount: features.length 
+        });
+      } else {
+        setLocalModifiedFeatures([]);
       }
+    } catch (error) {
+      logger.error('Failed to process modified features', { error });
+      setLocalModifiedFeatures([]);
+    } finally {
+      setIsLoadingModified(false);
+      refreshInProgressRef.current = false;
     }
-  }, [variantJson, logger]);
+  }, [modifiedFeatures, getAllModifiedFeatures, logger]);
 
   // Only refresh data when tab changes to "modified"
   useEffect(() => {
@@ -170,11 +179,14 @@ export function Controls({ variantId = "default" }: ControlsProps) {
         top_k: 10
       });
       
-      // Initialize with modifiedActivation = 0
-      const resultsWithModified = results.map(feature => ({
-        ...feature,
-        modifiedActivation: 0
-      }));
+      // Initialize with modifiedActivation from our centralized store
+      const resultsWithModified = results.map(feature => {
+        const modValue = modifiedFeatures.get(feature.label);
+        return {
+          ...feature,
+          modifiedActivation: modValue !== undefined ? modValue : 0
+        };
+      });
       
       logger.debug("Search results", { results: resultsWithModified });
       setSearchResults(resultsWithModified);
@@ -215,7 +227,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
       return <div className="text-sm text-gray-500">Loading variant state...</div>;
     }
 
-    if (!modifiedFeatures || modifiedFeatures.length === 0) {
+    if (!localModifiedFeatures || localModifiedFeatures.length === 0) {
       return (
         <div className="text-sm text-gray-500">
           No modified features.
@@ -225,7 +237,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
 
     return (
       <FeatureTable
-        features={modifiedFeatures}
+        features={localModifiedFeatures}
         selectedFeature={selectedFeature}
         onSelectFeature={handleSelectFeature}
         onSteer={handleSteer}

@@ -15,6 +15,7 @@ interface VariantContextType {
   
   // New properties for steering comparison
   pendingFeatures: Map<string, number>;
+  modifiedFeatures: Map<string, number>; // New centralized map of all modified features
   lastConfirmedState: any | null;
   currentResponse: string | null;
   originalResponse: string | null;
@@ -30,6 +31,10 @@ interface VariantContextType {
   generateSteeredResponse: (messages: ChatMessage[]) => Promise<void>;
   hasPendingFeatures: () => boolean;
   setOriginalResponseFromChat: (content: string) => void;
+  
+  // New feature helper methods
+  getFeatureModification: (label: string) => number | null;
+  getAllModifiedFeatures: () => Map<string, number>;
 }
 
 // Create the context with a default value
@@ -56,6 +61,7 @@ export function VariantProvider({
   
   // New state for steering comparison
   const [pendingFeatures, setPendingFeatures] = useState<Map<string, number>>(new Map());
+  const [modifiedFeatures, setModifiedFeatures] = useState<Map<string, number>>(new Map());
   const [lastConfirmedState, setLastConfirmedState] = useState<any | null>(null);
   const [originalResponse, setOriginalResponse] = useState<string | null>(null);
   const [currentResponse, setCurrentResponse] = useState<string | null>(null);
@@ -73,6 +79,22 @@ export function VariantProvider({
       // When we get fresh variant data, also update the last confirmed state
       if (!lastConfirmedState) {
         setLastConfirmedState(response);
+      }
+      
+      // Update the centralized modified features map
+      if (response && Array.isArray(response.edits)) {
+        const newModifiedFeatures = new Map<string, number>();
+        
+        response.edits.forEach((edit: any) => {
+          if (edit.feature_label && typeof edit.value === 'number') {
+            newModifiedFeatures.set(edit.feature_label, edit.value);
+          }
+        });
+        
+        setModifiedFeatures(newModifiedFeatures);
+        logger.debug('Updated modified features map', { 
+          featureCount: newModifiedFeatures.size 
+        });
       }
     } catch (error) {
       logger.error('Failed to refresh variant data', { error });
@@ -194,6 +216,18 @@ export function VariantProvider({
         const updatedVariantState = await featuresApi.getModifiedFeatures(sessionId, variantId);
         setVariantJson(updatedVariantState);
         setLastConfirmedState(updatedVariantState);
+        
+        // Update the modified features map with the pending features
+        setModifiedFeatures(prevModified => {
+          const newModified = new Map(prevModified);
+          
+          // Merge in pending features
+          for (const [label, value] of pendingFeatures.entries()) {
+            newModified.set(label, value);
+          }
+          
+          return newModified;
+        });
       }
       
       // Update currentResponse with the steered response, but keep originalResponse unchanged
@@ -271,6 +305,20 @@ export function VariantProvider({
   const hasPendingFeatures = useCallback(() => {
     return pendingFeatures.size > 0;
   }, [pendingFeatures]);
+  
+  /**
+   * Returns the modification value for a feature if it exists
+   */
+  const getFeatureModification = useCallback((label: string): number | null => {
+    return modifiedFeatures.has(label) ? modifiedFeatures.get(label)! : null;
+  }, [modifiedFeatures]);
+  
+  /**
+   * Returns all modified features
+   */
+  const getAllModifiedFeatures = useCallback((): Map<string, number> => {
+    return new Map(modifiedFeatures);
+  }, [modifiedFeatures]);
 
   // Context value
   const value = {
@@ -281,6 +329,7 @@ export function VariantProvider({
     
     // New properties
     pendingFeatures,
+    modifiedFeatures,
     lastConfirmedState,
     originalResponse,
     currentResponse,
@@ -295,7 +344,11 @@ export function VariantProvider({
     cancelSteering,
     generateSteeredResponse,
     hasPendingFeatures,
-    setOriginalResponseFromChat
+    setOriginalResponseFromChat,
+    
+    // New feature helper methods
+    getFeatureModification,
+    getAllModifiedFeatures
   };
 
   return (

@@ -30,12 +30,17 @@ export function FeatureEditor({
   onSteer,
   onClose
 }: FeatureEditorProps) {
-  const { variantId, applyPendingFeatures } = useVariant();
+  const { variantId, applyPendingFeatures, getFeatureModification } = useVariant();
   const [isLoading, setIsLoading] = useState(false);
   
-  // Initialize slider with modifiedActivation or 0
+  // Initialize slider with modification value from context or 0
   const [sliderValue, setSliderValue] = useState<number[]>(() => {
     if (!feature) return [0];
+    
+    // Check context first, then fall back to component prop
+    const contextValue = feature ? getFeatureModification(feature.label) : null;
+    if (contextValue !== null) return [contextValue];
+    
     return feature.modifiedActivation !== undefined ? [feature.modifiedActivation] : [0];
   });
 
@@ -46,9 +51,14 @@ export function FeatureEditor({
       return;
     }
     
-    const value = feature.modifiedActivation !== undefined ? feature.modifiedActivation : 0;
+    // Get modification from context first, then fall back to component prop
+    const contextValue = getFeatureModification(feature.label);
+    const value = contextValue !== null 
+      ? contextValue
+      : (feature.modifiedActivation !== undefined ? feature.modifiedActivation : 0);
+    
     setSliderValue([value]);
-  }, [feature]);
+  }, [feature, getFeatureModification]);
 
   if (!feature) return null;
 
@@ -126,8 +136,11 @@ export function FeatureEditor({
     }
   };
 
-  // Get display value for current status
-  const currentValue = feature.modifiedActivation !== undefined ? feature.modifiedActivation : 0;
+  // Get display value for current status from context first, then component prop
+  const contextValue = getFeatureModification(feature.label);
+  const currentValue = contextValue !== null 
+    ? contextValue
+    : (feature.modifiedActivation !== undefined ? feature.modifiedActivation : 0);
 
   return (
     <div className="pt-2 mt-1 border-t bg-background">
@@ -136,7 +149,7 @@ export function FeatureEditor({
           <div>
             <h3 className="font-medium">{feature.label}</h3>
               <div className="text-xs text-gray-500">
-                Activation: {(feature.modifiedActivation ?? 0).toFixed(1)}
+                Activation: {currentValue.toFixed(1)}
               </div>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} className="p-1 h-auto">
