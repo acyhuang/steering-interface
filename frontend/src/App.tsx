@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { createLogger } from "@/lib/logger"
 import { TestBenchProvider } from "@/lib/testbench/TestBenchProvider"
 import { TestBenchPanel } from "@/lib/testbench/TestBenchPanel"
-import { FeatureActivationProvider } from "@/contexts/FeatureActivationContext"
+import { ActivatedFeatureProvider } from "@/contexts/ActivatedFeatureContext"
 import { VariantProvider } from "./contexts/VariantContext"
 
 const logger = createLogger('App')
@@ -36,7 +36,7 @@ function App() {
   
   return (
     <VariantProvider>
-      <FeatureActivationProvider>
+      <ActivatedFeatureProvider>
         <TestBenchProvider>
           <div className="h-screen flex flex-col">
             <div className="p-2 flex justify-between items-center border-b">
@@ -65,7 +65,7 @@ function App() {
             </Split>
           </div>
         </TestBenchProvider>
-      </FeatureActivationProvider>
+      </ActivatedFeatureProvider>
     </VariantProvider>
     
   )

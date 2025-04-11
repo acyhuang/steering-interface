@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { createLogger } from "@/lib/logger"
 import { featuresApi } from "@/lib/api"
 import { FeatureCardProps } from "./variants"
-import { useFeatureActivations } from "@/contexts/FeatureActivationContext"
+import { useFeatureActivations } from "@/contexts/ActivatedFeatureContext"
 import { useVariant } from "@/contexts/VariantContext"
 
 const logger = createLogger('ContinuousFeatureCard')

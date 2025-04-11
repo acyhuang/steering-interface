@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { featuresApi } from "@/lib/api"
 import { createLogger } from "@/lib/logger"
 import { FeatureCardProps } from "./variants"
-import { useFeatureActivations } from "@/contexts/FeatureActivationContext"
+import { useFeatureActivations } from "@/contexts/ActivatedFeatureContext"
 import { useVariant } from "@/contexts/VariantContext"
 
 const logger = createLogger('DiscreteFeatureCard')

@@ -8,7 +8,7 @@ import { featuresApi } from '@/lib/api';
 import { useLogger } from '@/lib/logger';
 import { useVariant } from './VariantContext';
 
-interface FeatureActivationContextType {
+interface ActivatedFeatureContextType {
   // State
   activeFeatures: FeatureActivation[];
   featureClusters: FeatureCluster[];
@@ -22,14 +22,14 @@ interface FeatureActivationContextType {
   getFeatureActivation: (featureLabel: string) => number | undefined;
 }
 
-const FeatureActivationContext = createContext<FeatureActivationContextType | undefined>(undefined);
+const ActivatedFeatureContext = createContext<ActivatedFeatureContextType | undefined>(undefined);
 
-export interface FeatureActivationProviderProps {
+export interface ActivatedFeatureProviderProps {
   children: ReactNode;
 }
 
-export function FeatureActivationProvider({ children }: FeatureActivationProviderProps) {
-  const logger = useLogger('FeatureActivationContext');
+export function ActivatedFeatureProvider({ children }: ActivatedFeatureProviderProps) {
+  const logger = useLogger('ActivatedFeatureContext');
   const { variantId, variantJson } = useVariant();
   const [activeFeatures, setActiveFeaturesState] = useState<FeatureActivation[]>([]);
   const [featureClusters, setFeatureClustersState] = useState<FeatureCluster[]>([]);
@@ -144,16 +144,16 @@ export function FeatureActivationProvider({ children }: FeatureActivationProvide
   };
 
   return (
-    <FeatureActivationContext.Provider value={value}>
+    <ActivatedFeatureContext.Provider value={value}>
       {children}
-    </FeatureActivationContext.Provider>
+    </ActivatedFeatureContext.Provider>
   );
 }
 
 export function useFeatureActivations() {
-  const context = useContext(FeatureActivationContext);
+  const context = useContext(ActivatedFeatureContext);
   if (context === undefined) {
-    throw new Error('useFeatureActivations must be used within a FeatureActivationProvider');
+    throw new Error('useFeatureActivations must be used within a ActivatedFeatureProvider');
   }
   return context;
 } 

@@ -19,7 +19,7 @@ import {
 } from "@/types/features"
 import { featuresApi } from "@/lib/api"
 import { useLogger } from '@/lib/logger'
-import { useFeatureActivations } from '@/contexts/FeatureActivationContext'
+import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext'
 import { useVariant } from '@/contexts/VariantContext'
 import { FeatureTable, FeatureEditor } from './feature-row'
 

@@ -75,7 +75,7 @@ This feature allows users to compare the effects of different steering actions o
      - When applying pending changes: Update both variant and pending features map
      - When confirming changes: Clear pending features map and save variant as confirmed state
      - When canceling changes: Restore variant from last confirmed state and clear pending map
-   - Coordination with FeatureActivationContext:
+   - Coordination with ActivatedFeatureContext:
      - Update UI sliders to reflect pending state
      - Visualize which features have pending changes
 

@@ -6,7 +6,7 @@ import { ChatMessage } from '@/types/chat';
 import { chatApi, featuresApi } from '@/lib/api';
 import { Textarea } from './ui/textarea';
 import { useVariant } from '@/contexts/VariantContext';
-import { useFeatureActivations } from '@/contexts/FeatureActivationContext';
+import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext';
 import { createLogger } from '@/lib/logger';
 import { ComparisonView } from './ComparisonView';
 
