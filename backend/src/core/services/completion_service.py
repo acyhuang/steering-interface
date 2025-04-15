@@ -43,7 +43,7 @@ class CompletionService(ICompletionService):
         session_id: str,
         variant_id: Optional[str] = None,
         stream: bool = False,
-        max_completion_tokens: Optional[int] = 512,
+        max_completion_tokens: Optional[int] = 256,
         temperature: Optional[float] = 0.7,
         top_p: Optional[float] = 0.9
     ) -> ChatResponse:

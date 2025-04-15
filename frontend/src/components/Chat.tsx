@@ -9,6 +9,7 @@ import { useVariant } from '@/contexts/VariantContext';
 import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext';
 import { createLogger } from '@/lib/logger';
 import { ComparisonView } from './ComparisonView';
+import { SuggestedPrompts } from './SuggestedPrompts';
 
 interface ChatProps {
   onVariantChange?: (variantId: string) => void;
@@ -32,6 +33,7 @@ export function Chat({ onVariantChange }: ChatProps) {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const wasComparingRef = useRef<boolean>(false);
+  const [showSuggestedPrompts, setShowSuggestedPrompts] = useState(true);
 
   // Track when comparison mode changes
   useEffect(() => {
@@ -237,6 +239,33 @@ export function Chat({ onVariantChange }: ChatProps) {
     return processFeatures(messages);
   }, [messages]);
 
+  useEffect(() => {
+    // Hide suggestions when there are messages
+    if (messages.length > 0) {
+      setShowSuggestedPrompts(false);
+    } else {
+      setShowSuggestedPrompts(true);
+    }
+  }, [messages.length]);
+
+  const handleSelectPrompt = (promptText: string) => {
+    setInput(currentInput => {
+      const newInput = currentInput.trim() ? `${currentInput} ${promptText}` : promptText;
+      return newInput;
+    });
+    
+    // Hide the suggested prompts after selection
+    setShowSuggestedPrompts(false);
+    
+    // Need to adjust the textarea height after setting the input
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        adjustTextareaHeight();
+      }
+    }, 0);
+  };
+
   return (
     <div className="flex flex-col h-full border-0">
       <div className="p-2 border-b bg-muted/50">
@@ -285,6 +314,12 @@ export function Chat({ onVariantChange }: ChatProps) {
                 className="mt-4" 
                 refreshFeatures={refreshFeaturesCallback} 
               />
+            </div>
+          )}
+          {/* Display suggested prompts when no messages and showSuggestedPrompts is true */}
+          {messages.length === 0 && showSuggestedPrompts && (
+            <div className="px-2 pb-4 absolute bottom-0 left-0 right-0">
+              <SuggestedPrompts onSelectPrompt={handleSelectPrompt} />
             </div>
           )}
         </div>

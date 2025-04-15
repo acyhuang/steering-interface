@@ -206,7 +206,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     if (!activeFeatures || activeFeatures.length === 0) {
       return (
         <div className="text-sm text-gray-500">
-          Activated features are features are influencing the model's responses. Start a conversation to see activated features.
+          Start a conversation to see activated features.
         </div>
       );
     }
