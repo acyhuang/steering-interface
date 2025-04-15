@@ -72,7 +72,7 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
           onClick={handleSelectOriginal}
         >
           <div className="mb-2 text-sm text-center text-muted-foreground">Original Response</div>
-          <div className=" text-left whitespace-pre-wrap overflow-auto max-h-[400px]">
+          <div className="text-left whitespace-pre-wrap">
             {originalResponse}
           </div>
         </Card>
@@ -83,7 +83,7 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
           onClick={handleSelectSteered}
         >
           <div className="mb-2 text-sm text-center text-muted-foreground">Steered Response</div>
-          <div className=" text-left whitespace-pre-wrap overflow-auto max-h-[400px]">
+          <div className="text-left whitespace-pre-wrap">
             {steeredResponse}
           </div>
         </Card>

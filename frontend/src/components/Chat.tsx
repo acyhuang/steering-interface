@@ -303,7 +303,7 @@ export function Chat({ onVariantChange }: ChatProps) {
           ))}
           {isLoading && !isComparingResponses && (
             <div className="text-gray-500">
-              {isRegenerating ? "Regenerating..." : "Loading..."}
+              {isRegenerating ? "Regenerating response..." : "Generating response..."}
             </div>
           )}
           

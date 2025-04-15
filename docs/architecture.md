@@ -21,26 +21,39 @@ sequenceDiagram
     FI-->>CI: Show Feature Activations
 ```
 
-#### [TODO] Message (with autosteer)
+#### Message (with autosteer)
 ```mermaid
 sequenceDiagram
     participant U as User
     participant CI as Chat.tsx
-    participant AQ as /features/analyze-query
-    participant AS as /features/auto-steer
+    participant CO as Controls.tsx (autoSteer toggle)
     participant CC as /chat/completions
-    participant FI as /features/inspect
+    participant AQ as /features/analyze-query
+    participant CV as ComparisonView
+    participant VC as VariantContext
     
+    U->>CO: Toggle AutoSteer ON
     U->>CI: Send Message
-    CI->>AQ: Analyze Query
-    AQ->>AS: Request Auto-Steering
-    AS->>AS: Calculate Steering Values
-    AS-->>AQ: Return Steering Values
-    AQ-->>CI: Return Steering Config
-    CI->>CC: POST Request with Steering
-    CC-->>CI: Return Optimized Response
-    CI->>FI: POST Request
-    FI-->>CI: Show Feature Activations
+    CI->>CC: POST Request with autoSteer=true
+    CC->>AQ: Analyze Query
+    AQ->>AQ: Calculate Steering Values
+    AQ-->>CC: Return Steering Config
+    CC->>CC: Generate Original Response
+    CC->>CC: Apply Steering Values
+    CC->>CC: Generate Steered Response
+    CC-->>CI: Return Both Responses
+    CI->>CV: Display Comparison View
+    CV-->>U: Show Original vs Steered
+    
+    alt User Selects Steered Response
+        U->>CV: Confirms steered version
+        CV->>VC: confirmSteeredResponse()
+        VC->>VC: Apply auto-steered features permanently
+    else User Rejects Steered Response
+        U->>CV: Selects original version
+        CV->>VC: cancelSteering()
+        VC->>VC: Discard auto-steered features
+    end
 ```
 
 #### Steering Comparison Flow
