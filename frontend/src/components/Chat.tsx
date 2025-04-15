@@ -274,7 +274,7 @@ export function Chat({ onVariantChange }: ChatProps) {
         </div>
       </div>
       <ScrollArea className="flex-1 p-2">
-        <div className="space-y-4">
+        <div className="w-full max-w-2xl mx-auto space-y-4">
           {
             // When in comparison mode, filter out the last assistant message
             (isComparingResponses 
@@ -325,7 +325,7 @@ export function Chat({ onVariantChange }: ChatProps) {
         </div>
       </ScrollArea>
       <div className="p-2 border-t">
-        <div className="flex gap-2 items-end">
+        <div className="flex gap-2 items-end max-w-2xl mx-auto">
           <Textarea
             ref={textareaRef}
             value={input}
