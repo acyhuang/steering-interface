@@ -3,7 +3,6 @@
 **TODO (next actions):** 
 - side-by-side add summary of differences
 - fix autosteer, allow toggle on/off?
-- refactor feature state management by extending VariantContext
 
 **SMALL FIXES:**
 - stream response?

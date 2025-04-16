@@ -28,7 +28,7 @@ export function FeatureRow({
       onClick={() => onSelect(feature)}
       data-feature-id={feature.label}
     >
-      <div className="text-sm">{feature.label}</div>
+      <div className="text-sm text-gray-700">{feature.label}</div>
       <div className={`text-sm ${displayValue !== 0 ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
         {displayValue.toFixed(1)}
       </div>

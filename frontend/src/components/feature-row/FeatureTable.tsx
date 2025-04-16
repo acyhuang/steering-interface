@@ -46,7 +46,7 @@ export function FeatureTable({
         {clusters.map((cluster) => (
           <div key={cluster.name} >
             <div 
-              className="flex items-center justify-between p-2 bg-gray-50 hover:bg-gray-100 cursor-pointer rounded-md"
+              className="flex items-center justify-between p-2 bg-gray-100 hover:bg-gray-200 cursor-pointer rounded-md"
               onClick={() => toggleCluster(cluster.name)}
             >
               <div className="text-xs uppercase font-medium text-gray-500">{cluster.name}</div>
