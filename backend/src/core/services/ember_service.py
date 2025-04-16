@@ -53,12 +53,6 @@ class EmberService:
         # Initialize service components
         self.variant_manager = VariantManager(settings)
         
-        self.completion_service = CompletionService(
-            client=self.client,
-            variant_manager=self.variant_manager,
-            settings=settings
-        )
-        
         self.feature_service = FeatureService(
             client=self.client,
             variant_manager=self.variant_manager,
@@ -70,6 +64,13 @@ class EmberService:
             variant_manager=self.variant_manager,
             feature_service=self.feature_service,
             llm_client=self.llm_client,
+            settings=settings
+        )
+        
+        self.completion_service = CompletionService(
+            client=self.client,
+            variant_manager=self.variant_manager,
+            analysis_service=self.analysis_service,
             settings=settings
         )
         
@@ -105,6 +106,7 @@ class EmberService:
         messages: List[ChatMessage],
         session_id: str,
         variant_id: Optional[str] = None,
+        auto_steer: bool = False,
         stream: bool = False,
         max_completion_tokens: Optional[int] = 512,
         temperature: Optional[float] = 0.7,
@@ -114,7 +116,8 @@ class EmberService:
         return await self.completion_service.create_chat_completion(
             messages, 
             session_id, 
-            variant_id, 
+            variant_id,
+            auto_steer, 
             stream, 
             max_completion_tokens, 
             temperature, 

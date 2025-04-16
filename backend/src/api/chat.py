@@ -30,7 +30,8 @@ async def create_chat_completion(
         logger.info("Received chat request with structure:", extra={
             "message_count": len(request.messages) if request.messages else 0,
             "messages": [{"role": m.role, "content": m.content[:50] + "..." if len(m.content) > 50 else m.content} 
-                        for m in request.messages] if request.messages else []
+                        for m in request.messages] if request.messages else [],
+            "auto_steer": request.auto_steer
         })
         
         # For now, use a simple session ID. Later we'll implement proper session management
@@ -81,6 +82,7 @@ async def create_chat_completion(
             messages=request.messages,
             session_id=session_id,
             variant_id=None,  # Use default variant
+            auto_steer=request.auto_steer,
             max_completion_tokens=request.max_completion_tokens,
             temperature=request.temperature,
             top_p=request.top_p

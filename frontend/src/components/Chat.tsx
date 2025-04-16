@@ -5,7 +5,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { ChatMessage } from '@/types/chat';
 import { chatApi, featuresApi } from '@/lib/api';
 import { Textarea } from './ui/textarea';
-import { useVariant } from '@/contexts/VariantContext';
+import { useVariant } from '@/hooks/useVariant';
 import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext';
 import { createLogger } from '@/lib/logger';
 import { ComparisonView } from './ComparisonView';
@@ -26,7 +26,12 @@ export function Chat({ onVariantChange }: ChatProps) {
     setOriginalResponseFromChat,
     generateSteeredResponse,
     isComparingResponses,
-    currentResponse
+    setIsComparingResponses,
+    currentResponse,
+    autoSteerEnabled,
+    pendingFeatures,
+    setPendingFeatures,
+    setSteeredResponse
   } = useVariant();
   const { setActiveFeatures, setFeatureClusters } = useFeatureActivations();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -142,7 +147,8 @@ export function Chat({ onVariantChange }: ChatProps) {
     try {
       const response = await chatApi.createChatCompletion({
         messages: [...messages, userMessage],
-        variant_id: variantId
+        variant_id: variantId,
+        auto_steer: autoSteerEnabled
       });
 
       logger.debug('Response from API', { response });
@@ -152,6 +158,55 @@ export function Chat({ onVariantChange }: ChatProps) {
         content: response.content,
       };
 
+      // Handle auto-steered responses
+      if (response.auto_steered && response.auto_steer_result) {
+        logger.info('Received auto-steered response', {
+          hasOriginal: !!response.auto_steer_result.original_content,
+          hasSteered: !!response.auto_steer_result.steered_content,
+          featureCount: response.auto_steer_result.applied_features.length
+        });
+        
+        // Store the original response for comparison
+        setOriginalResponseFromChat(response.auto_steer_result.original_content);
+        
+        // Set the steered response in the variant context
+        setSteeredResponse(response.auto_steer_result.steered_content);
+        
+        // Set pending features from auto-steer suggestions
+        const newPendingFeatures = new Map<string, number>();
+        response.auto_steer_result.applied_features.forEach(feature => {
+          newPendingFeatures.set(feature.label, feature.modified_value);
+        });
+        setPendingFeatures(newPendingFeatures);
+        
+        // Create assistant messages for both original and steered responses
+        const originalAssistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: response.auto_steer_result.original_content
+        };
+        
+        const steeredAssistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: response.auto_steer_result.steered_content
+        };
+        
+        // Update message list with original response initially
+        const updatedMessages = [...messages, userMessage, originalAssistantMessage];
+        setMessages(updatedMessages);
+        
+        // Enter comparison mode
+        setIsComparingResponses(true);
+        
+        if (response.variant_id && response.variant_id !== variantId) {
+          setVariantId(response.variant_id);
+          onVariantChange?.(response.variant_id);
+        }
+        
+        await processFeatures(updatedMessages);
+        return;
+      }
+
+      // Normal response handling (no auto-steer)
       const updatedMessages = [...messages, userMessage, assistantMessage];
       setMessages(updatedMessages);
       

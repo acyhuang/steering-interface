@@ -15,6 +15,7 @@ class ICompletionService(ABC):
         messages: List[ChatMessage],
         session_id: str,
         variant_id: Optional[str] = None,
+        auto_steer: bool = False,
         stream: bool = False,
         max_completion_tokens: Optional[int] = 512,
         temperature: Optional[float] = 0.7,
@@ -26,6 +27,7 @@ class ICompletionService(ABC):
             messages: List of chat messages for context
             session_id: Session identifier
             variant_id: Optional variant ID (defaults to "default")
+            auto_steer: Whether to apply automatic steering based on query analysis
             stream: Whether to stream the response
             max_completion_tokens: Maximum tokens to generate
             temperature: Temperature parameter for generation

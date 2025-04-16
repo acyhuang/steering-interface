@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { createLogger } from '@/lib/logger';
 import { featuresApi, chatApi } from '@/lib/api';
 import { ChatMessage } from '@/types/chat';
@@ -8,7 +8,7 @@ import { SteeringLoadingState, LoadingStateInfo, createLoadingState } from '@/ty
 const logger = createLogger('VariantContext');
 
 // Define the context interface
-interface VariantContextType {
+export interface VariantContextType {
   variantId: string;
   setVariantId: (id: string) => void;
   variantJson: any | null;
@@ -16,14 +16,21 @@ interface VariantContextType {
   
   // New properties for steering comparison
   pendingFeatures: Map<string, number>;
+  setPendingFeatures: (features: Map<string, number>) => void; 
   modifiedFeatures: Map<string, number>; // New centralized map of all modified features
   lastConfirmedState: any | null;
   currentResponse: string | null;
   originalResponse: string | null;
   steeredResponse: string | null;
+  setSteeredResponse: (content: string | null) => void;
   steeringState: LoadingStateInfo<SteeringLoadingState>;
   isComparingResponses: boolean;
+  setIsComparingResponses: (comparing: boolean) => void;
   generationError: Error | null;
+  
+  // Auto-Steer properties
+  autoSteerEnabled: boolean;
+  setAutoSteerEnabled: (enabled: boolean) => void;
   
   // Computed properties for backward compatibility
   isGeneratingSteeredResponse: boolean;
@@ -42,7 +49,7 @@ interface VariantContextType {
 }
 
 // Create the context with a default value
-const VariantContext = createContext<VariantContextType | undefined>(undefined);
+export const VariantContext = createContext<VariantContextType | undefined>(undefined);
 
 // Provider props interface
 interface VariantProviderProps {
@@ -76,6 +83,14 @@ export function VariantProvider({
   );
   const [isComparingResponses, setIsComparingResponses] = useState<boolean>(false);
   const [generationError, setGenerationError] = useState<Error | null>(null);
+  
+  // Auto-Steer state
+  const [autoSteerEnabled, setAutoSteerEnabled] = useState<boolean>(false);
+
+  // Log when autoSteerEnabled changes
+  useEffect(() => {
+    logger.debug('Auto-Steer state changed', { autoSteerEnabled });
+  }, [autoSteerEnabled]);
 
   // Computed properties for backwards compatibility
   const isGeneratingSteeredResponse = steeringState.state === SteeringLoadingState.GENERATING_RESPONSE;
@@ -367,14 +382,21 @@ export function VariantProvider({
     
     // New properties
     pendingFeatures,
+    setPendingFeatures,
     modifiedFeatures,
     lastConfirmedState,
     originalResponse,
     currentResponse,
     steeredResponse,
+    setSteeredResponse,
     steeringState,
     isComparingResponses,
+    setIsComparingResponses,
     generationError,
+    
+    // Auto-Steer properties
+    autoSteerEnabled,
+    setAutoSteerEnabled,
     
     // Computed properties for backward compatibility
     isGeneratingSteeredResponse,
@@ -397,17 +419,4 @@ export function VariantProvider({
       {children}
     </VariantContext.Provider>
   );
-}
-
-/**
- * Custom hook that provides access to the variant context
- */
-export function useVariant() {
-  const context = useContext(VariantContext);
-  
-  if (context === undefined) {
-    throw new Error('useVariant must be used within a VariantProvider');
-  }
-  
-  return context;
 }

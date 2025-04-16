@@ -1,9 +1,10 @@
 import React from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
-import { useVariant } from '@/contexts/VariantContext';
+import { useVariant } from '@/hooks/useVariant';
 import { createLogger } from '@/lib/logger';
 import { SteeringLoadingState } from '@/types/loading';
+import ReactMarkdown from 'react-markdown';
 
 interface ComparisonViewProps {
   className?: string;
@@ -98,8 +99,10 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
           onClick={handleSelectOriginal}
         >
           <div className="mb-2 text-sm text-center text-muted-foreground">Original Response</div>
-          <div className="text-left whitespace-pre-wrap">
-            {originalResponse}
+          <div className="prose prose-base">
+            <ReactMarkdown>
+              {originalResponse}
+            </ReactMarkdown>
           </div>
         </Card>
 
@@ -109,8 +112,10 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
           onClick={handleSelectSteered}
         >
           <div className="mb-2 text-sm text-center text-muted-foreground">Steered Response</div>
-          <div className="text-left whitespace-pre-wrap">
-            {steeredResponse}
+          <div className="prose prose-base">
+            <ReactMarkdown>
+              {steeredResponse}
+            </ReactMarkdown>
           </div>
         </Card>
       </div>

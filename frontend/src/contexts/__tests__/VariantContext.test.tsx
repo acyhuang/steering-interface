@@ -3,7 +3,7 @@ import './__mocks__';
 import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { useVariant } from '../VariantContext';
+import { useVariant } from '../../hooks/useVariant';
 import { TestWrapper, configureMockApis, resetMockApis } from './test-utils';
 import { mockMessages, mockFeaturesApi, mockChatApi } from './api-mocks';
 

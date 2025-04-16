@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List, Literal, Dict
-from ..models.chat import ChatMessage
+from .base_models import ChatMessage
 
 class FeatureActivation(BaseModel):
     """Model representing an activated feature and its strength.

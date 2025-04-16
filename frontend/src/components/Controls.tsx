@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
 import { useState, useEffect, useRef } from "react"
 import { Search, HelpCircle } from "lucide-react"
 import { Button } from "./ui/button"
+import { Switch } from "./ui/switch"
 import {
   Dialog,
   DialogContent,
@@ -20,9 +21,10 @@ import {
 import { featuresApi } from "@/lib/api"
 import { useLogger } from '@/lib/logger'
 import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext'
-import { useVariant } from '@/contexts/VariantContext'
+import { useVariant } from '@/hooks/useVariant'
 import { FeatureTable, FeatureEditor } from './feature-row'
 import { ControlsLoadingState, LoadingStateInfo, createLoadingState } from '@/types/loading'
+import { createLogger } from "@/lib/logger"
 
 interface ControlsProps {
   variantId?: string;
@@ -41,6 +43,25 @@ interface VariantResponse {
   scopes: any[];
 }
 
+// Auto-Steer Toggle component
+interface AutoSteerToggleProps {
+  enabled: boolean;
+  onToggle: (enabled: boolean) => void;
+}
+
+function AutoSteerToggle({ enabled, onToggle }: AutoSteerToggleProps) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-medium">Auto-Steer</span>
+      <Switch 
+        checked={enabled} 
+        onCheckedChange={onToggle} 
+        aria-label="Toggle Auto-Steer"
+      />
+    </div>
+  );
+}
+
 export function Controls({ variantId = "default" }: ControlsProps) {
   const logger = useLogger('Controls')
   const { activeFeatures, featureClusters, isLoading: isLoadingFeatures } = useFeatureActivations();
@@ -48,7 +69,9 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     variantJson, 
     refreshVariant, 
     modifiedFeatures, 
-    getAllModifiedFeatures 
+    getAllModifiedFeatures,
+    autoSteerEnabled,
+    setAutoSteerEnabled
   } = useVariant();
   
   const [searchQuery, setSearchQuery] = useState("")
@@ -108,30 +131,6 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     fetchModifiedFeatures();
   }, [modifiedFeatures, getAllModifiedFeatures, logger]);
 
-  // Only refresh data when tab changes to "modified"
-  useEffect(() => {
-    const fetchData = async () => {
-      if (selectedTab === "modified" && loadingState.state === ControlsLoadingState.IDLE) {
-        setLoadingState(createLoadingState(ControlsLoadingState.LOADING_MODIFIED));
-        logger.debug('Loading modified features tab data');
-        
-        try {
-          await refreshVariant();
-        } catch (error) {
-          logger.error('Failed to refresh variant data', { error });
-          setLoadingState(createLoadingState(
-            ControlsLoadingState.IDLE,
-            error instanceof Error ? error : new Error(String(error))
-          ));
-        } finally {
-          setLoadingState(createLoadingState(ControlsLoadingState.IDLE));
-        }
-      }
-    };
-
-    fetchData();
-  }, [selectedTab, refreshVariant, loadingState.state, logger]);
-
   // Clear selected feature when switching tabs
   useEffect(() => {
     setSelectedFeature(null);
@@ -149,6 +148,11 @@ export function Controls({ variantId = "default" }: ControlsProps) {
 
   const handleCloseEditor = () => {
     setSelectedFeature(null);
+  };
+
+  const handleAutoSteerToggle = (enabled: boolean) => {
+    // logger.debug('Auto-Steer toggle clicked in Controls', { enabled });
+    setAutoSteerEnabled(enabled);
   };
 
   const handleSteer = async (response: SteerFeatureResponse) => {
@@ -341,32 +345,38 @@ export function Controls({ variantId = "default" }: ControlsProps) {
       <div className="flex flex-col h-full gap-2">
         <div className="flex justify-between items-center gap-1">
           <h2 className="text-lg font-semibold">Steering Controls</h2>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setHelpDialogOpen(true)}
-            className="rounded-full" 
-            aria-label="Help"
-          >
-            <HelpCircle className="h-5 w-5" />
-          </Button>
-          
-          <Dialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Understanding steering controls</DialogTitle>
-                <DialogDescription>
-                  <div className="mt-4 space-y-4 text-sm">
-                    <p>Features are internal representations of concepts that the LLM has learned. Steering controls allow you to strengthen or weaken features in the model to influence its behavior.</p>
-                    <p><span className="font-medium">Activated:</span> Features that are currently influencing the model's outputs in your conversation.</p>
-                    <p><span className="font-medium">Modified:</span> Features that have been strengthened or weakened from the model's default state.</p>
-                    <p><span className="font-medium">Search:</span> Allows you to find features by their meaning or purpose.</p>
-                  
-                  </div>
-                </DialogDescription>
-              </DialogHeader>
-            </DialogContent>
-          </Dialog>
+          <div className="flex items-center gap-2">
+            <AutoSteerToggle 
+              enabled={autoSteerEnabled}
+              onToggle={handleAutoSteerToggle}
+            />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setHelpDialogOpen(true)}
+              className="rounded-full" 
+              aria-label="Help"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </Button>
+            
+            <Dialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Understanding steering controls</DialogTitle>
+                  <DialogDescription>
+                    <div className="mt-4 space-y-4 text-sm">
+                      <p>Features are internal representations of concepts that the LLM has learned. Steering controls allow you to strengthen or weaken features in the model to influence its behavior.</p>
+                      <p><span className="font-medium">Activated:</span> Features that are currently influencing the model's outputs in your conversation.</p>
+                      <p><span className="font-medium">Modified:</span> Features that have been strengthened or weakened from the model's default state.</p>
+                      <p><span className="font-medium">Search:</span> Allows you to find features by their meaning or purpose.</p>
+                      <p><span className="font-medium">Auto-Steer:</span> When enabled, automatically suggests feature adjustments based on your query.</p>
+                    </div>
+                  </DialogDescription>
+                </DialogHeader>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <Tabs 

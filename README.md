@@ -3,6 +3,7 @@
 **TODO (next actions):** 
 - side-by-side add summary of differences
 - fix autosteer, allow toggle on/off?
+- refactor types to be domain-driven
 
 **SMALL FIXES:**
 - stream response?

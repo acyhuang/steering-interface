@@ -86,7 +86,7 @@ Consider:
 - What problem-solving approach would work best?
 
 Step 3: Feature Categories
-For each category below, suggest specific features that would help create this persona, with importance scores (1-4):
+For each category below, suggest 1-2 specific features that would help create this persona, with importance scores (1-4):
 
 1. Writing Style (how the response should be communicated)
 2. Reasoning Method (how the assistant should approach the problem)
@@ -107,7 +107,7 @@ Format your response as JSON:
       {{ "label": "string", "importance": 2 }}
     ],
     "knowledge": [
-      {{ "label": "string", "importance": 2 }}
+      {{ "label": "string", "importance": 1 }}
     ]
   }}
 }}

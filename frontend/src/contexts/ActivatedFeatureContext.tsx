@@ -1,12 +1,13 @@
-import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 import { 
   FeatureActivation, 
   FeatureCluster,
   ClusteredFeaturesResponse
 } from '@/types/features';
 import { featuresApi } from '@/lib/api';
-import { useLogger } from '@/lib/logger';
-import { useVariant } from './VariantContext';
+import { createLogger } from '@/lib/logger';
+import { VariantContext } from './VariantContext';
+import { useVariant } from '@/hooks/useVariant';
 
 interface ActivatedFeatureContextType {
   // State
@@ -28,12 +29,27 @@ export interface ActivatedFeatureProviderProps {
   children: ReactNode;
 }
 
+// Helper function to check if two arrays of features have the same modified activation values
+function haveModificationsChanged(prevFeatures: FeatureActivation[], nextFeatures: FeatureActivation[]): boolean {
+  if (prevFeatures.length !== nextFeatures.length) return true;
+  
+  for (let i = 0; i < prevFeatures.length; i++) {
+    if (prevFeatures[i].label !== nextFeatures[i].label ||
+        prevFeatures[i].modifiedActivation !== nextFeatures[i].modifiedActivation) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 export function ActivatedFeatureProvider({ children }: ActivatedFeatureProviderProps) {
-  const logger = useLogger('ActivatedFeatureContext');
+  const logger = createLogger('ActivatedFeatureContext');
   const { variantId, variantJson } = useVariant();
   const [activeFeatures, setActiveFeaturesState] = useState<FeatureActivation[]>([]);
   const [featureClusters, setFeatureClustersState] = useState<FeatureCluster[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const previousVariantJson = useRef<any>(null);
 
   // Set active features with modifiedActivation initialized to 0
   const setActiveFeatures = useCallback((features: FeatureActivation[]) => {
@@ -50,7 +66,17 @@ export function ActivatedFeatureProvider({ children }: ActivatedFeatureProviderP
 
   // Update modifiedActivation values when variantJson changes
   useEffect(() => {
-    if (variantJson && Array.isArray(variantJson.edits) && activeFeatures.length > 0) {
+    // Skip if no features or variant hasn't changed
+    if (!activeFeatures.length || 
+        !variantJson || 
+        JSON.stringify(previousVariantJson.current) === JSON.stringify(variantJson)) {
+      return;
+    }
+    
+    // Update ref to current variant
+    previousVariantJson.current = variantJson;
+    
+    if (Array.isArray(variantJson.edits)) {
       logger.debug('Updating modified activations from variant data', {
         editCount: variantJson.edits.length,
         featureCount: activeFeatures.length
@@ -74,9 +100,12 @@ export function ActivatedFeatureProvider({ children }: ActivatedFeatureProviderP
         };
       });
       
-      setActiveFeaturesState(updatedFeatures);
+      // Only update state if there are actual changes to the modified values
+      if (haveModificationsChanged(activeFeatures, updatedFeatures)) {
+        setActiveFeaturesState(updatedFeatures);
+      }
     }
-  }, [variantJson, activeFeatures.length, logger]);
+  }, [variantJson, logger, activeFeatures]);
 
   // Set feature clusters
   const setFeatureClusters = useCallback((clusters: FeatureCluster[]) => {

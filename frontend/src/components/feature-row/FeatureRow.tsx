@@ -1,5 +1,5 @@
 import { FeatureActivation } from "@/types/features"
-import { useVariant } from "@/contexts/VariantContext";
+import { useVariant } from "@/hooks/useVariant";
 
 interface FeatureRowProps {
   feature: FeatureActivation;
