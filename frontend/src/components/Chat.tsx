@@ -10,6 +10,7 @@ import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext';
 import { createLogger } from '@/lib/logger';
 import { ComparisonView } from './ComparisonView';
 import { SuggestedPrompts } from './SuggestedPrompts';
+import { ChatLoadingState, LoadingStateInfo, createLoadingState } from '@/types/loading';
 
 interface ChatProps {
   onVariantChange?: (variantId: string) => void;
@@ -29,34 +30,31 @@ export function Chat({ onVariantChange }: ChatProps) {
   const { setActiveFeatures, setFeatureClusters } = useFeatureActivations();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [loadingState, setLoadingState] = useState<LoadingStateInfo<ChatLoadingState>>(
+    createLoadingState(ChatLoadingState.IDLE)
+  );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const wasComparingRef = useRef<boolean>(false);
   const [showSuggestedPrompts, setShowSuggestedPrompts] = useState(true);
 
-  // Track when comparison mode changes
+  const isLoading = loadingState.state !== ChatLoadingState.IDLE;
+  const isRegenerating = loadingState.state === ChatLoadingState.REGENERATING;
+
   useEffect(() => {
-    // Only track when isComparingResponses is true
     if (isComparingResponses) {
       wasComparingRef.current = true;
     }
   }, [isComparingResponses]);
 
-  // Add a useEffect to track when comparison mode ends and update messages
   useEffect(() => {
-    // Only run this effect when exiting comparison mode and we have a current response
     if (!isComparingResponses && wasComparingRef.current && currentResponse && messages.length > 0) {
       logger.debug('Exiting comparison mode, updating messages with current response');
       
-      // Find the last assistant message in the array using reverse search
       const lastAssistantIndex = [...messages].reverse().findIndex(m => m.role === 'assistant');
       
       if (lastAssistantIndex !== -1) {
-        // Convert the reverse index to normal index
         const actualIndex = messages.length - 1 - lastAssistantIndex;
         
-        // Update the message
         const updatedMessages = [...messages];
         updatedMessages[actualIndex] = {
           ...updatedMessages[actualIndex],
@@ -72,7 +70,6 @@ export function Chat({ onVariantChange }: ChatProps) {
         logger.warn('Could not find assistant message to update');
       }
       
-      // Reset the tracking ref
       wasComparingRef.current = false;
     }
   }, [isComparingResponses, currentResponse, messages, logger]);
@@ -91,18 +88,17 @@ export function Chat({ onVariantChange }: ChatProps) {
 
   const processFeatures = async (messageList: ChatMessage[]) => {
     try {
+      setLoadingState(createLoadingState(ChatLoadingState.INSPECTING_FEATURES));
       logger.debug('Inspecting features for messages', { messageCount: messageList.length });
       
-      // Step 1: Call inspect features
       const features = await featuresApi.inspectFeatures({
         messages: messageList,
-        session_id: "default_session" // TODO: Use real session management
+        session_id: "default_session"
       });
       
       logger.debug('Feature inspection completed', { featureCount: features.length });
       setActiveFeatures(features);
       
-      // Step 2: Cluster the features
       if (features.length > 0) {
         logger.debug('Clustering features', { featureCount: features.length });
         const clusterResponse = await featuresApi.clusterFeatures(
@@ -122,6 +118,11 @@ export function Chat({ onVariantChange }: ChatProps) {
       logger.error('Failed to process features', { 
         error: error instanceof Error ? { message: error.message } : { raw: String(error) } 
       });
+      setLoadingState(createLoadingState(ChatLoadingState.IDLE, 
+        error instanceof Error ? error : new Error(String(error))
+      ));
+    } finally {
+      setLoadingState(createLoadingState(ChatLoadingState.IDLE));
     }
   };
 
@@ -135,7 +136,7 @@ export function Chat({ onVariantChange }: ChatProps) {
 
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
-    setIsLoading(true);
+    setLoadingState(createLoadingState(ChatLoadingState.SENDING));
 
     try {
       const response = await chatApi.createChatCompletion({
@@ -153,21 +154,21 @@ export function Chat({ onVariantChange }: ChatProps) {
       const updatedMessages = [...messages, userMessage, assistantMessage];
       setMessages(updatedMessages);
       
-      // Update variant if returned in response
       if (response.variant_id && response.variant_id !== variantId) {
         setVariantId(response.variant_id);
         onVariantChange?.(response.variant_id);
       }
       
-      // Process features after completion
       await processFeatures(updatedMessages);
     } catch (error) {
       logger.error('Failed to send message', { 
         error: error instanceof Error ? { message: error.message } : { raw: String(error) } 
       });
-      // TODO: Add error handling UI
+      setLoadingState(createLoadingState(ChatLoadingState.IDLE, 
+        error instanceof Error ? error : new Error(String(error))
+      ));
     } finally {
-      setIsLoading(false);
+      setLoadingState(createLoadingState(ChatLoadingState.IDLE));
     }
   };
 
@@ -175,72 +176,58 @@ export function Chat({ onVariantChange }: ChatProps) {
     if (messages.length < 2) return;
 
     logger.debug('Starting regenerateLastMessage', { messageCount: messages.length });
-    setIsLoading(true);
-    setIsRegenerating(true);
+    setLoadingState(createLoadingState(ChatLoadingState.REGENERATING));
     
     const lastUserIndex = [...messages].reverse().findIndex(m => m.role === 'user');
     if (lastUserIndex === -1) return;
     
-    // Find the most recent assistant message to use as the original response
     const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant');
     
-    // Get all the messages up to and including the last user message
     const contextMessages = messages.slice(0, messages.length - lastUserIndex);
 
     try {
-      // Check if we have pending features that need comparison
       const hasPending = hasPendingFeatures();
       
       if (hasPending && lastAssistantMessage) {
-        // Set the original response in the variant context
         setOriginalResponseFromChat(lastAssistantMessage.content);
         
-        // Generate a steered response using the message context
         try {
           await generateSteeredResponse(contextMessages);
         } catch (genError) {
           logger.error('Error during generateSteeredResponse', {
             error: genError instanceof Error ? { message: genError.message } : { raw: String(genError) }
           });
+          setLoadingState(createLoadingState(ChatLoadingState.IDLE, 
+            genError instanceof Error ? genError : new Error(String(genError))
+          ));
         }
         
-        // Stop here when comparison mode is active
-        // The ComparisonView component will handle the rest of the flow
-        setIsLoading(false);
-        setIsRegenerating(false);
+        setLoadingState(createLoadingState(ChatLoadingState.IDLE));
         return;
       }
     } finally {
-      setIsLoading(false);
-      setIsRegenerating(false);
+      setLoadingState(createLoadingState(ChatLoadingState.IDLE));
     }
   }, [
     messages, 
     logger, 
-    setIsLoading, 
-    setIsRegenerating, 
     hasPendingFeatures, 
     setOriginalResponseFromChat, 
-    generateSteeredResponse, 
-    isComparingResponses
+    generateSteeredResponse 
   ]);
 
-  // Expose regenerateLastMessage to parent components
   useEffect(() => {
     if (window) {
-      // @ts-ignore
       window.regenerateLastMessage = regenerateLastMessage;
     }
   }, [regenerateLastMessage]);
 
-  // Create a callback for feature refresh
   const refreshFeaturesCallback = useCallback(async () => {
     logger.debug('Refreshing activated features after steering confirmed');
     return processFeatures(messages);
   }, [messages]);
 
   useEffect(() => {
-    // Hide suggestions when there are messages
     if (messages.length > 0) {
       setShowSuggestedPrompts(false);
     } else {
@@ -254,16 +241,27 @@ export function Chat({ onVariantChange }: ChatProps) {
       return newInput;
     });
     
-    // Hide the suggested prompts after selection
     setShowSuggestedPrompts(false);
     
-    // Need to adjust the textarea height after setting the input
     setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
         adjustTextareaHeight();
       }
     }, 0);
+  };
+
+  const getLoadingMessage = () => {
+    switch (loadingState.state) {
+      case ChatLoadingState.REGENERATING:
+        return "Regenerating response...";
+      case ChatLoadingState.SENDING:
+        return "Generating response...";
+      case ChatLoadingState.INSPECTING_FEATURES:
+        return "Inspecting features...";
+      default:
+        return "Loading...";
+    }
   };
 
   return (
@@ -276,7 +274,6 @@ export function Chat({ onVariantChange }: ChatProps) {
       <ScrollArea className="flex-1 p-2">
         <div className="w-full max-w-2xl mx-auto space-y-4">
           {
-            // When in comparison mode, filter out the last assistant message
             (isComparingResponses 
               ? messages.filter((_, idx) => !(
                   messages[idx].role === 'assistant' && 
@@ -303,11 +300,10 @@ export function Chat({ onVariantChange }: ChatProps) {
           ))}
           {isLoading && !isComparingResponses && (
             <div className="text-gray-500">
-              {isRegenerating ? "Regenerating response..." : "Generating response..."}
+              {getLoadingMessage()}
             </div>
           )}
           
-          {/* Comparison View */}
           {isComparingResponses && (
             <div className="w-full">
               <ComparisonView 
@@ -316,7 +312,6 @@ export function Chat({ onVariantChange }: ChatProps) {
               />
             </div>
           )}
-          {/* Display suggested prompts when no messages and showSuggestedPrompts is true */}
           {messages.length === 0 && showSuggestedPrompts && (
             <div className="px-2 pb-4 absolute bottom-0 left-0 right-0">
               <SuggestedPrompts onSelectPrompt={handleSelectPrompt} />

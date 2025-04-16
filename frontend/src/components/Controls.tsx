@@ -22,6 +22,7 @@ import { useLogger } from '@/lib/logger'
 import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext'
 import { useVariant } from '@/contexts/VariantContext'
 import { FeatureTable, FeatureEditor } from './feature-row'
+import { ControlsLoadingState, LoadingStateInfo, createLoadingState } from '@/types/loading'
 
 interface ControlsProps {
   variantId?: string;
@@ -42,7 +43,7 @@ interface VariantResponse {
 
 export function Controls({ variantId = "default" }: ControlsProps) {
   const logger = useLogger('Controls')
-  const { activeFeatures, featureClusters, isLoading } = useFeatureActivations();
+  const { activeFeatures, featureClusters, isLoading: isLoadingFeatures } = useFeatureActivations();
   const { 
     variantJson, 
     refreshVariant, 
@@ -52,11 +53,12 @@ export function Controls({ variantId = "default" }: ControlsProps) {
   
   const [searchQuery, setSearchQuery] = useState("")
   const [localModifiedFeatures, setLocalModifiedFeatures] = useState<FeatureActivation[]>([])
-  const [isLoadingModified, setIsLoadingModified] = useState(false)
+  // Replace multiple loading states with a single state machine
+  const [loadingState, setLoadingState] = useState<LoadingStateInfo<ControlsLoadingState>>(
+    createLoadingState(ControlsLoadingState.IDLE)
+  );
   const [selectedTab, setSelectedTab] = useState("activated")
   const [searchResults, setSearchResults] = useState<FeatureActivation[]>([])
-  const [isSearching, setIsSearching] = useState(false)
-  const refreshInProgressRef = useRef(false);
   
   // New state for selected feature
   const [selectedFeature, setSelectedFeature] = useState<FeatureActivation | null>(null);
@@ -64,48 +66,71 @@ export function Controls({ variantId = "default" }: ControlsProps) {
   // State for help dialog
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
 
+  // Computed properties for backward compatibility
+  const isLoadingModified = loadingState.state === ControlsLoadingState.LOADING_MODIFIED;
+  const isSearching = loadingState.state === ControlsLoadingState.SEARCHING;
+  const refreshInProgress = loadingState.state !== ControlsLoadingState.IDLE;
+
   // Process modifiedFeatures from context to local state
   useEffect(() => {
-    setIsLoadingModified(true);
-    
-    try {
-      const allModifiedFeatures = getAllModifiedFeatures();
-      if (allModifiedFeatures.size > 0) {
-        // Convert Map to FeatureActivation array
-        const features: FeatureActivation[] = Array.from(allModifiedFeatures.entries())
-          .map(([label, value]) => ({
-            label,
-            activation: 0, // Base activation is not relevant here
-            modifiedActivation: value
-          }));
-        setLocalModifiedFeatures(features);
-        logger.debug('Updated local modified features from context', { 
-          featureCount: features.length 
-        });
-      } else {
+    const fetchModifiedFeatures = async () => {
+      setLoadingState(createLoadingState(ControlsLoadingState.LOADING_MODIFIED));
+      
+      try {
+        const allModifiedFeatures = getAllModifiedFeatures();
+        if (allModifiedFeatures.size > 0) {
+          // Convert Map to FeatureActivation array
+          const features: FeatureActivation[] = Array.from(allModifiedFeatures.entries())
+            .map(([label, value]) => ({
+              label,
+              activation: 0, // Base activation is not relevant here
+              modifiedActivation: value
+            }));
+          setLocalModifiedFeatures(features);
+          logger.debug('Updated local modified features from context', { 
+            featureCount: features.length 
+          });
+        } else {
+          setLocalModifiedFeatures([]);
+        }
+      } catch (error) {
+        logger.error('Failed to process modified features', { error });
         setLocalModifiedFeatures([]);
+        setLoadingState(createLoadingState(
+          ControlsLoadingState.IDLE, 
+          error instanceof Error ? error : new Error(String(error))
+        ));
+      } finally {
+        setLoadingState(createLoadingState(ControlsLoadingState.IDLE));
       }
-    } catch (error) {
-      logger.error('Failed to process modified features', { error });
-      setLocalModifiedFeatures([]);
-    } finally {
-      setIsLoadingModified(false);
-      refreshInProgressRef.current = false;
-    }
+    };
+
+    fetchModifiedFeatures();
   }, [modifiedFeatures, getAllModifiedFeatures, logger]);
 
   // Only refresh data when tab changes to "modified"
   useEffect(() => {
     const fetchData = async () => {
-      if (selectedTab === "modified" && !refreshInProgressRef.current) {
-        refreshInProgressRef.current = true;
+      if (selectedTab === "modified" && loadingState.state === ControlsLoadingState.IDLE) {
+        setLoadingState(createLoadingState(ControlsLoadingState.LOADING_MODIFIED));
         logger.debug('Loading modified features tab data');
-        await refreshVariant();
+        
+        try {
+          await refreshVariant();
+        } catch (error) {
+          logger.error('Failed to refresh variant data', { error });
+          setLoadingState(createLoadingState(
+            ControlsLoadingState.IDLE,
+            error instanceof Error ? error : new Error(String(error))
+          ));
+        } finally {
+          setLoadingState(createLoadingState(ControlsLoadingState.IDLE));
+        }
       }
     };
 
     fetchData();
-  }, [selectedTab, refreshVariant]);
+  }, [selectedTab, refreshVariant, loadingState.state, logger]);
 
   // Clear selected feature when switching tabs
   useEffect(() => {
@@ -127,48 +152,59 @@ export function Controls({ variantId = "default" }: ControlsProps) {
   };
 
   const handleSteer = async (response: SteerFeatureResponse) => {
-    logger.debug('Handling steer response', { response });
+    setLoadingState(createLoadingState(ControlsLoadingState.STEERING));
     
-    // Update the feature in the appropriate list based on the current tab
-    if (selectedTab === "search") {
-      // For search results, we need to update the local state
-      setSearchResults(prev => 
-        prev.map(f => {
-          if (f.label === response.label) {
-            return { 
-              ...f, 
-              modifiedActivation: response.activation 
-            };
-          }
-          return f;
-        })
-      );
-    } else if (selectedTab === "modified") {
-      // For modified tab, refresh the variant data
-      refreshInProgressRef.current = true;
-      await refreshVariant();
-    }
-    
-    // Update the selected feature state if needed
-    if (selectedFeature && selectedFeature.label === response.label) {
-      setSelectedFeature({
-        ...selectedFeature,
-        modifiedActivation: response.activation
-      });
-    }
+    try {
+      logger.debug('Handling steer response', { response });
+      
+      // Update the feature in the appropriate list based on the current tab
+      if (selectedTab === "search") {
+        // For search results, we need to update the local state
+        setSearchResults(prev => 
+          prev.map(f => {
+            if (f.label === response.label) {
+              return { 
+                ...f, 
+                modifiedActivation: response.activation 
+              };
+            }
+            return f;
+          })
+        );
+      } else if (selectedTab === "modified") {
+        // For modified tab, refresh the variant data
+        await refreshVariant();
+      }
+      
+      // Update the selected feature state if needed
+      if (selectedFeature && selectedFeature.label === response.label) {
+        setSelectedFeature({
+          ...selectedFeature,
+          modifiedActivation: response.activation
+        });
+      }
 
-    // Regenerate the last message after steering
-    // @ts-ignore
-    if (window.regenerateLastMessage) {
+      // Regenerate the last message after steering
       // @ts-ignore
-      await window.regenerateLastMessage();
+      if (window.regenerateLastMessage) {
+        // @ts-ignore
+        await window.regenerateLastMessage();
+      }
+    } catch (error) {
+      logger.error('Failed to handle steer response', { error });
+      setLoadingState(createLoadingState(
+        ControlsLoadingState.IDLE,
+        error instanceof Error ? error : new Error(String(error))
+      ));
+    } finally {
+      setLoadingState(createLoadingState(ControlsLoadingState.IDLE));
     }
   }
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     
-    setIsSearching(true);
+    setLoadingState(createLoadingState(ControlsLoadingState.SEARCHING));
     
     try {
       logger.debug("Searching for features with query", { query: searchQuery });
@@ -193,13 +229,17 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     } catch (error) {
       logger.error("Error searching features", { error });
       setSearchResults([]);
+      setLoadingState(createLoadingState(
+        ControlsLoadingState.IDLE,
+        error instanceof Error ? error : new Error(String(error))
+      ));
     } finally {
-      setIsSearching(false);
+      setLoadingState(createLoadingState(ControlsLoadingState.IDLE));
     }
   }
 
   const renderActivatedFeatures = () => {
-    if (isLoading) {
+    if (isLoadingFeatures) {
       return <div className="text-sm text-gray-500">Loading features...</div>;
     }
 
@@ -283,7 +323,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
             }
           }}
         />
-        <Button onClick={handleSearch} type="submit">
+        <Button onClick={handleSearch} type="submit" disabled={isSearching}>
           <Search className="h-4 w-4" />
         </Button>
       </div>

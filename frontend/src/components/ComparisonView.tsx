@@ -3,6 +3,7 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { useVariant } from '@/contexts/VariantContext';
 import { createLogger } from '@/lib/logger';
+import { SteeringLoadingState } from '@/types/loading';
 
 interface ComparisonViewProps {
   className?: string;
@@ -16,7 +17,7 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
     steeredResponse,
     confirmSteeredResponse,
     cancelSteering,
-    isGeneratingSteeredResponse,
+    steeringState,
     generationError
   } = useVariant();
 
@@ -30,11 +31,36 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
     confirmSteeredResponse(refreshFeatures);
   };
 
-  if (isGeneratingSteeredResponse) {
+  // Check if we're in a generating state
+  const isGenerating = steeringState.state === SteeringLoadingState.GENERATING_RESPONSE;
+  
+  // Check if we're in a confirming or canceling state
+  const isProcessing = 
+    steeringState.state === SteeringLoadingState.CONFIRMING || 
+    steeringState.state === SteeringLoadingState.CANCELING;
+
+  if (isGenerating) {
     return (
       <div className={`flex flex-col gap-2 p-4 ${className}`}>
         <div className="text-center font-medium text-muted-foreground">
           Generating steered response...
+        </div>
+        <div className="flex justify-center">
+          <div className="animate-pulse w-8 h-8 rounded-full bg-muted"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isProcessing) {
+    const actionText = steeringState.state === SteeringLoadingState.CONFIRMING 
+      ? "Confirming" 
+      : "Canceling";
+      
+    return (
+      <div className={`flex flex-col gap-2 p-4 ${className}`}>
+        <div className="text-center font-medium text-muted-foreground">
+          {actionText} response choice...
         </div>
         <div className="flex justify-center">
           <div className="animate-pulse w-8 h-8 rounded-full bg-muted"></div>
