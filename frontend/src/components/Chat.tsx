@@ -11,6 +11,7 @@ import { createLogger } from '@/lib/logger';
 import { ComparisonView } from './ComparisonView';
 import { SuggestedPrompts } from './SuggestedPrompts';
 import { ChatLoadingState, LoadingStateInfo, createLoadingState } from '@/types/loading';
+import ReactMarkdown from 'react-markdown';
 
 interface ChatProps {
   onVariantChange?: (variantId: string) => void;
@@ -294,7 +295,15 @@ export function Chat({ onVariantChange }: ChatProps) {
                   message.role === 'user' ? 'text-gray-700' : 'text-gray-700'
                 }`}
               >
-                <div className="whitespace-pre-wrap">{message.content}</div>
+                {message.role === 'user' ? (
+                  <div className="whitespace-pre-wrap">{message.content}</div>
+                ) : (
+                  <div className="prose prose-base">
+                    <ReactMarkdown>
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </div>
             </div>
           ))}
