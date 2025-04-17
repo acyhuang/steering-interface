@@ -328,54 +328,59 @@ export function Chat({ onVariantChange }: ChatProps) {
         </div>
       </div>
       <ScrollArea className="flex-1 p-2">
-        <div className="w-full max-w-2xl mx-auto space-y-4">
-          {
-            (isComparingResponses 
-              ? messages.filter((_, idx) => !(
-                  messages[idx].role === 'assistant' && 
-                  idx === messages.length - 1
-                ))
-              : messages
-            ).map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+        <div className="flex flex-col items-center w-full space-y-4">
+          {/* Regular chat messages in a bounded container */}
+          <div className="w-full max-w-2xl space-y-4">
+            {
+              (isComparingResponses 
+                ? messages.filter((_, idx) => !(
+                    messages[idx].role === 'assistant' && 
+                    idx === messages.length - 1
+                  ))
+                : messages
+              ).map((message, index) => (
               <div
-                className={`${
-                  message.role === 'user'
-                    ? 'bg-gray-100 rounded-lg px-3 py-2 max-w-[80%]'
-                    : 'max-w-[90%]'
-                } ${
-                  message.role === 'user' ? 'text-gray-700' : 'text-gray-700'
-                }`}
+                key={index}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                {message.role === 'user' ? (
-                  <div className="whitespace-pre-wrap">{message.content}</div>
-                ) : (
-                  <div className="prose prose-base">
-                    <ReactMarkdown>
-                      {message.content}
-                    </ReactMarkdown>
-                  </div>
-                )}
+                <div
+                  className={`${
+                    message.role === 'user'
+                      ? 'bg-gray-100 rounded-lg px-3 py-2 max-w-[80%]'
+                      : 'max-w-[90%]'
+                  } ${
+                    message.role === 'user' ? 'text-gray-700' : 'text-gray-700'
+                  }`}
+                >
+                  {message.role === 'user' ? (
+                    <div className="whitespace-pre-wrap">{message.content}</div>
+                  ) : (
+                    <div className="prose prose-base">
+                      <ReactMarkdown>
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-          {isLoading && !isComparingResponses && (
-            <div className="text-gray-500">
-              {getLoadingMessage()}
-            </div>
-          )}
+            ))}
+            {isLoading && !isComparingResponses && (
+              <div className="text-gray-500">
+                {getLoadingMessage()}
+              </div>
+            )}
+          </div>
           
+          {/* ComparisonView in a wider container but still in the message flow */}
           {isComparingResponses && (
-            <div className="w-full">
+            <div className="w-full max-w-4xl">
               <ComparisonView 
                 className="mt-4" 
                 refreshFeatures={refreshFeaturesCallback} 
               />
             </div>
           )}
+          
           {messages.length === 0 && showSuggestedPrompts && (
             <div className="px-2 pb-4 absolute bottom-0 left-0 right-0">
               <SuggestedPrompts onSelectPrompt={handleSelectPrompt} />
@@ -383,6 +388,7 @@ export function Chat({ onVariantChange }: ChatProps) {
           )}
         </div>
       </ScrollArea>
+      
       <div className="p-2 border-t">
         <div className="flex gap-2 items-end max-w-2xl mx-auto">
           <Textarea

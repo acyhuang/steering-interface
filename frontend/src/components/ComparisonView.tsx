@@ -92,14 +92,14 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
         Which response do you prefer?
       </div>
       
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-6">
         {/* Original Response */}
         <Card 
-          className="w-full h-full border-2 hover:border-primary cursor-pointer p-4 hover:bg-accent/50 transition-colors"
+          className="w-full h-full border-2 hover:border-primary cursor-pointer p-6 hover:bg-accent/50 transition-colors"
           onClick={handleSelectOriginal}
         >
-          <div className="mb-2 text-sm text-center text-muted-foreground">Original Response</div>
-          <div className="prose prose-base">
+          <div className="mb-2 text-sm font-medium text-center text-muted-foreground">Original Response</div>
+          <div className="prose prose-base max-w-none">
             <ReactMarkdown>
               {originalResponse}
             </ReactMarkdown>
@@ -108,11 +108,11 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
 
         {/* Steered Response */}
         <Card 
-          className="w-full h-full border-2 hover:border-primary cursor-pointer p-4 hover:bg-accent/50 transition-colors"
+          className="w-full h-full border-2 hover:border-primary cursor-pointer p-6 hover:bg-accent/50 transition-colors"
           onClick={handleSelectSteered}
         >
-          <div className="mb-2 text-sm text-center text-muted-foreground">Steered Response</div>
-          <div className="prose prose-base">
+          <div className="mb-2 text-sm font-medium text-center text-muted-foreground">Steered Response</div>
+          <div className="prose prose-base max-w-none">
             <ReactMarkdown>
               {steeredResponse}
             </ReactMarkdown>
