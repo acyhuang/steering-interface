@@ -3,7 +3,7 @@ import { Card } from "./ui/card"
 import { ScrollArea } from "./ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
 import { useState, useEffect, useRef } from "react"
-import { Search, HelpCircle, AlertCircle, RefreshCcw, Info } from "lucide-react"
+import { Search, AlertCircle, RefreshCcw, Info, ChevronRight, ChevronLeft, SidebarOpen, SidebarIcon, ChevronsLeftIcon, LucidePanelLeftOpen, PanelRightOpen, PanelRightClose } from "lucide-react"
 import { Button } from "./ui/button"
 import { Switch } from "./ui/switch"
 import {
@@ -23,9 +23,12 @@ import { useVariant } from '@/hooks/useVariant'
 import { FeatureTable, FeatureEditor } from './feature-row'
 import { ControlsLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui'
 import { createLogger } from "@/lib/logger"
+import { Badge } from "./ui/badge"
 
 interface ControlsProps {
   variantId?: string;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 interface FeatureEdit {
@@ -60,7 +63,47 @@ function AutoSteerToggle({ enabled, onToggle }: AutoSteerToggleProps) {
   );
 }
 
-export function Controls({ variantId = "default" }: ControlsProps) {
+// New component for the collapsed controls view
+function CollapsedControls({ 
+  autoSteerEnabled, 
+  modifiedCount, 
+  onToggleCollapse 
+}: { 
+  autoSteerEnabled: boolean; 
+  modifiedCount: number;
+  onToggleCollapse?: () => void;
+}) {
+  return (
+    <div className="h-full w-full flex flex-col items-center py-4 border-l bg-background">
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        onClick={onToggleCollapse}
+        className="mb-6" 
+        aria-label="Expand controls"
+      >
+        <PanelRightOpen className="h-5 w-5" />
+      </Button>
+
+      {/* Auto-steer indicator */}
+      <div className="flex flex-col items-center pb-16 mb-6">
+        <div className={`w-3 h-3 rounded-full ${autoSteerEnabled ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+        <div className="relative">
+          <span className="text-xs absolute whitespace-nowrap" style={{ transform: 'rotate(90deg)', transformOrigin: 'left center', left: 0, top: 0 }}>Auto-steer</span>
+        </div>
+      </div>
+
+      {/* Modified features count */}
+      {modifiedCount > 0 && (
+        <Badge variant="secondary" className="mb-6">
+          {modifiedCount}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+export function Controls({ variantId = "default", isCollapsed = false, onToggleCollapse }: ControlsProps) {
   const logger = useLogger('Controls')
   const { activeFeatures, featureClusters, isLoading: isLoadingFeatures } = useFeatureActivations();
   const { 
@@ -84,13 +127,13 @@ export function Controls({ variantId = "default" }: ControlsProps) {
   // New state for selected feature
   const [selectedFeature, setSelectedFeature] = useState<FeatureActivation | null>(null);
   
-  // State for help dialog
-  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
-
   // Computed properties for backward compatibility
   const isLoadingModified = loadingState.state === ControlsLoadingState.LOADING_MODIFIED;
   const isSearching = loadingState.state === ControlsLoadingState.SEARCHING;
   const refreshInProgress = loadingState.state !== ControlsLoadingState.IDLE;
+
+  // Get count of modified features
+  const modifiedCount = localModifiedFeatures.length;
 
   // Process modifiedFeatures from context to local state
   useEffect(() => {
@@ -338,6 +381,17 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     ? "calc(100vh - 400px)" // Reduced height when editor is visible
     : "calc(100vh - 280px)"; // Original height
 
+  // If collapsed, render the collapsed view instead
+  if (isCollapsed) {
+    return (
+      <CollapsedControls 
+        autoSteerEnabled={autoSteerEnabled}
+        modifiedCount={modifiedCount}
+        onToggleCollapse={onToggleCollapse}
+      />
+    );
+  }
+
   return (
     <div className="h-full p-2">
       <div className="flex flex-col h-full gap-2">
@@ -348,32 +402,16 @@ export function Controls({ variantId = "default" }: ControlsProps) {
               enabled={autoSteerEnabled}
               onToggle={handleAutoSteerToggle}
             />
+            
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => setHelpDialogOpen(true)}
+              onClick={onToggleCollapse}
               className="rounded-full" 
-              aria-label="Help"
+              aria-label="Collapse controls"
             >
-              <HelpCircle className="h-5 w-5" />
+              <PanelRightClose className="h-5 w-5" />
             </Button>
-            
-            <Dialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Understanding steering controls</DialogTitle>
-                  <DialogDescription>
-                    <div className="mt-4 space-y-4 text-sm">
-                      <p>Features are internal representations of concepts that the LLM has learned. Steering controls allow you to strengthen or weaken features in the model to influence its behavior.</p>
-                      <p><span className="font-medium">Activated:</span> Features that are currently influencing the model's outputs in your conversation.</p>
-                      <p><span className="font-medium">Modified:</span> Features that have been strengthened or weakened from the model's default state.</p>
-                      <p><span className="font-medium">Search:</span> Allows you to find features by their meaning or purpose.</p>
-                      <p><span className="font-medium">Auto-Steer:</span> When enabled, automatically suggests feature adjustments based on your query.</p>
-                    </div>
-                  </DialogDescription>
-                </DialogHeader>
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
 
