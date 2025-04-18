@@ -1,5 +1,6 @@
 import { ComponentType } from 'react';
-import { FeatureActivation, SteerFeatureResponse, FeatureCluster } from "@/types/features";
+import { FeatureActivation, SteerFeatureResponse } from "@/types/steering/feature";
+import { FeatureCluster } from "@/types/steering/cluster";
 import { useTestBench } from '@/lib/testbench/useTestBench';
 import { TestDefinition } from '@/lib/testbench/types';
 import { ClusteredFeatureList } from './ClusteredFeatureList';

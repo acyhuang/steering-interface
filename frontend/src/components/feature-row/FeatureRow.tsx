@@ -1,4 +1,4 @@
-import { FeatureActivation } from "@/types/features"
+import { FeatureActivation } from "@/types/steering/feature"
 import { useVariant } from "@/hooks/useVariant";
 
 interface FeatureRowProps {

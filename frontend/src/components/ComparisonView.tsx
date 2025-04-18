@@ -3,7 +3,7 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { useVariant } from '@/hooks/useVariant';
 import { createLogger } from '@/lib/logger';
-import { SteeringLoadingState } from '@/types/loading';
+import { SteeringLoadingState } from '@/types/ui';
 import ReactMarkdown from 'react-markdown';
 
 interface ComparisonViewProps {

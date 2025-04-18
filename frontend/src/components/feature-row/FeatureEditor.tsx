@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FeatureActivation, SteerFeatureResponse } from "@/types/features";
+import { FeatureActivation, SteerFeatureResponse } from "@/types/steering/feature";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

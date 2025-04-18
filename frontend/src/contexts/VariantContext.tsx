@@ -1,8 +1,8 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { createLogger } from '@/lib/logger';
 import { featuresApi, chatApi } from '@/lib/api';
-import { ChatMessage } from '@/types/chat';
-import { SteeringLoadingState, LoadingStateInfo, createLoadingState } from '@/types/loading';
+import { ChatMessage } from '@/types/conversation';
+import { SteeringLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui';
 
 // Logger for this context
 const logger = createLogger('VariantContext');

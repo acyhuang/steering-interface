@@ -3,7 +3,7 @@ import { Card } from "./ui/card"
 import { ScrollArea } from "./ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
 import { useState, useEffect, useRef } from "react"
-import { Search, HelpCircle } from "lucide-react"
+import { Search, HelpCircle, AlertCircle, RefreshCcw, Info } from "lucide-react"
 import { Button } from "./ui/button"
 import { Switch } from "./ui/switch"
 import {
@@ -12,18 +12,16 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "./ui/dialog"
-import { 
-  FeatureActivation, 
-  SteerFeatureResponse, 
-  FeatureCluster
-} from "@/types/features"
+import { FeatureActivation, SteerFeatureResponse } from "@/types/steering/feature"
+import { FeatureCluster } from "@/types/steering/cluster"
 import { featuresApi } from "@/lib/api"
 import { useLogger } from '@/lib/logger'
 import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext'
 import { useVariant } from '@/hooks/useVariant'
 import { FeatureTable, FeatureEditor } from './feature-row'
-import { ControlsLoadingState, LoadingStateInfo, createLoadingState } from '@/types/loading'
+import { ControlsLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui'
 import { createLogger } from "@/lib/logger"
 
 interface ControlsProps {

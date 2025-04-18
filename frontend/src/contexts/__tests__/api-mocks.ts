@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
-import { SteerFeatureResponse } from '@/types/features';
-import { ChatMessage, ChatResponse } from '@/types/chat';
+import { SteerFeatureResponse } from '@/types/steering/feature';
+import { ChatMessage, ChatResponse } from '@/types/conversation';
 import { mockFeaturesApi, mockChatApi } from './__mocks__';
 
 // API response mock types that match the actual API response types

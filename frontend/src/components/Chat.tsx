@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { ChatMessage } from '@/types/chat';
+import { ChatMessage } from '@/types/conversation';
 import { chatApi, featuresApi } from '@/lib/api';
 import { Textarea } from './ui/textarea';
 import { useVariant } from '@/hooks/useVariant';
@@ -10,7 +10,7 @@ import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext';
 import { createLogger } from '@/lib/logger';
 import { ComparisonView } from './ComparisonView';
 import { SuggestedPrompts } from './SuggestedPrompts';
-import { ChatLoadingState, LoadingStateInfo, createLoadingState } from '@/types/loading';
+import { ChatLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui';
 import ReactMarkdown from 'react-markdown';
 
 interface ChatProps {
@@ -382,7 +382,7 @@ export function Chat({ onVariantChange }: ChatProps) {
           )}
           
           {messages.length === 0 && showSuggestedPrompts && (
-            <div className="px-2 pb-4 absolute bottom-0 left-0 right-0">
+            <div className="px-2 pb-4 max-w-4xl mx-auto absolute bottom-0 left-0 right-0">
               <SuggestedPrompts onSelectPrompt={handleSelectPrompt} />
             </div>
           )}

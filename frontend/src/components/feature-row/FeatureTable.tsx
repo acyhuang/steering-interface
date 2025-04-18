@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { FeatureActivation, FeatureCluster, SteerFeatureResponse } from "@/types/features";
+import { FeatureActivation, SteerFeatureResponse } from "@/types/steering/feature";
+import { FeatureCluster } from "@/types/steering/cluster";
 import { FeatureRow } from "./FeatureRow";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
