@@ -2,7 +2,7 @@ import { Chat } from "@/components/Chat"
 import { ConnectionStatus } from "@/components/ConnectionStatus"
 import { Controls } from "@/components/Controls"
 import Split from 'react-split'
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { createLogger } from "@/lib/logger"
 import { TestBenchProvider } from "@/lib/testbench/TestBenchProvider"
 import { TestBenchPanel } from "@/lib/testbench/TestBenchPanel"
@@ -20,28 +20,37 @@ import {
 
 const logger = createLogger('App')
 
+// Fixed width for the collapsed sidebar
+const COLLAPSED_WIDTH = 60; // pixels
+// Default split sizes if none are saved
+const DEFAULT_SPLIT_SIZES = [75, 25]; // 75% chat, 25% controls
+
 function App() {
   // Store split sizes in localStorage to persist user preference
   const [sizes, setSizes] = useState(() => {
     const saved = localStorage.getItem('split-sizes')
-    const parsed = saved ? JSON.parse(saved) as number[] : null
-    return Array.isArray(parsed) ? parsed : [75, 25] // default split: 75% chat, 25% controls
+    try {
+      const parsed = saved ? JSON.parse(saved) as number[] : null
+      return Array.isArray(parsed) && parsed.length === 2 ? parsed : DEFAULT_SPLIT_SIZES
+    } catch (e) {
+      return DEFAULT_SPLIT_SIZES
+    }
   })
 
   // Track if controls panel is collapsed
   const [isCollapsed, setIsCollapsed] = useState(false)
-  // Store previous sizes when collapsing
-  const [previousSizes, setPreviousSizes] = useState<number[]>([])
 
   const [currentTestId, setCurrentTestId] = useState<string>("default")
   
   // Help dialog state
   const [helpDialogOpen, setHelpDialogOpen] = useState(false)
 
-  // Save sizes when they change
+  // Save sizes when they change (only when expanded)
   useEffect(() => {
-    localStorage.setItem('split-sizes', JSON.stringify(sizes))
-  }, [sizes])
+    if (!isCollapsed) {
+      localStorage.setItem('split-sizes', JSON.stringify(sizes))
+    }
+  }, [sizes, isCollapsed])
 
   useEffect(() => {
     logger.info('Application initialized')
@@ -53,15 +62,6 @@ function App() {
   
   // Toggle sidebar collapsed state
   const toggleSidebar = () => {
-    if (!isCollapsed) {
-      // Store current sizes before collapsing
-      setPreviousSizes(sizes)
-      // Set to collapsed sizes (95% chat, 5% controls)
-      setSizes([95, 5])
-    } else {
-      // Restore previous sizes
-      setSizes(previousSizes.length ? previousSizes : [75, 25])
-    }
     setIsCollapsed(!isCollapsed)
   }
   
@@ -102,38 +102,54 @@ function App() {
               </div>
               <ConnectionStatus />
             </div>
-            <Split 
-              className="flex-1 flex overflow-hidden split"
-              sizes={sizes}
-              minSize={isCollapsed ? [400, 40] : [400, 400]} 
-              onDragEnd={(newSizes) => {
-                // Only update sizes if not in collapsed state
-                if (!isCollapsed) {
+            
+            {isCollapsed ? (
+              // When collapsed, use a fixed layout with CSS
+              <div className="flex-1 flex overflow-hidden">
+                <div className="h-full flex-1">
+                  <Chat />
+                </div>
+                <div className="h-full border-l bg-background" style={{ width: `${COLLAPSED_WIDTH}px`, flexShrink: 0 }}>
+                  <Controls 
+                    variantId={currentTestId}
+                    isCollapsed={isCollapsed}
+                    onToggleCollapse={toggleSidebar}
+                  />
+                </div>
+              </div>
+            ) : (
+              // When expanded, use the Split component
+              <Split 
+                className="flex-1 flex overflow-hidden split"
+                sizes={sizes}
+                minSize={[400, 400]}
+                snapOffset={50}
+                onDragEnd={(newSizes) => {
                   setSizes(newSizes)
-                }
-              }}
-              gutterStyle={() => ({
-                backgroundColor: 'hsl(var(--border))',
-                width: '4px',
-                cursor: 'col-resize'
-              })}
-            >
-              <div className="h-full">
-                <Chat />
-              </div>
-              <div className="h-full">
-                <Controls 
-                  variantId={currentTestId}
-                  isCollapsed={isCollapsed}
-                  onToggleCollapse={toggleSidebar}
-                />
-              </div>
-            </Split>
+                }}
+                gutterSize={4}
+                gutterStyle={() => ({
+                  backgroundColor: 'hsl(var(--border))',
+                  width: '4px',
+                  cursor: 'col-resize'
+                })}
+              >
+                <div className="h-full">
+                  <Chat />
+                </div>
+                <div className="h-full">
+                  <Controls 
+                    variantId={currentTestId}
+                    isCollapsed={isCollapsed}
+                    onToggleCollapse={toggleSidebar}
+                  />
+                </div>
+              </Split>
+            )}
           </div>
         </TestBenchProvider>
       </ActivatedFeatureProvider>
     </VariantProvider>
-    
   )
 }
 

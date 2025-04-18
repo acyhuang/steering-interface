@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import { useVariant } from '@/hooks/useVariant';
 import { createLogger } from '@/lib/logger';
 import { SteeringLoadingState } from '@/types/ui';
@@ -11,6 +12,26 @@ interface ComparisonViewProps {
   refreshFeatures?: () => Promise<void>;
 }
 
+// Simple component to display a feature adjustment
+interface FeatureBadgeProps {
+  label: string;
+  value: number;
+}
+
+function FeatureBadge({ label, value }: FeatureBadgeProps) {
+  // Format the value with "+" prefix for positive values
+  const formattedValue = value > 0 ? `+${value}` : `${value}`;
+  
+  return (
+    <Badge 
+      variant="outline"
+      className="text-sm text-muted-foreground font-normal mr-1 mb-1"
+    >
+      {label}: {formattedValue}
+    </Badge>
+  );
+}
+
 export function ComparisonView({ className, refreshFeatures }: ComparisonViewProps) {
   const logger = createLogger('ComparisonView');
   const {
@@ -19,7 +40,8 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
     confirmSteeredResponse,
     cancelSteering,
     steeringState,
-    generationError
+    generationError,
+    pendingFeatures
   } = useVariant();
 
   const handleSelectOriginal = () => {
@@ -117,6 +139,19 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
               {steeredResponse}
             </ReactMarkdown>
           </div>
+
+          {/* Feature adjustment badges */}
+          {pendingFeatures.size > 0 && (
+            <div className="flex flex-wrap mt-4">
+              <div className="w-full text-sm font-medium text-muted-foreground my-2">
+                Applied feature adjustments:
+              </div>
+              {Array.from(pendingFeatures.entries()).map(([label, value]) => (
+                <FeatureBadge key={label} label={label} value={value} />
+              ))}
+            </div>
+          )}
+          
         </Card>
       </div>
     </div>

@@ -373,7 +373,7 @@ export function Chat({ onVariantChange }: ChatProps) {
           
           {/* ComparisonView in a wider container but still in the message flow */}
           {isComparingResponses && (
-            <div className="w-full max-w-4xl">
+            <div className="w-full max-w-6xl">
               <ComparisonView 
                 className="mt-4" 
                 refreshFeatures={refreshFeaturesCallback} 

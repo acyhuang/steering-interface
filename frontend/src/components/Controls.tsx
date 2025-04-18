@@ -87,7 +87,7 @@ function CollapsedControls({
 
       {/* Auto-steer indicator */}
       <div className="flex flex-col items-center pb-16 mb-6">
-        <div className={`w-3 h-3 rounded-full ${autoSteerEnabled ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+        <div className={`w-3 h-3 rounded-full ${autoSteerEnabled ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
         <div className="relative">
           <span className="text-xs absolute whitespace-nowrap" style={{ transform: 'rotate(90deg)', transformOrigin: 'left center', left: 0, top: 0 }}>Auto-steer</span>
         </div>
