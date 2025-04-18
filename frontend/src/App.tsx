@@ -1,7 +1,6 @@
 import { Chat } from "@/components/Chat"
 import { ConnectionStatus } from "@/components/ConnectionStatus"
 import { Controls } from "@/components/Controls"
-import Split from 'react-split'
 import { useEffect, useState, useRef } from "react"
 import { createLogger } from "@/lib/logger"
 import { TestBenchProvider } from "@/lib/testbench/TestBenchProvider"
@@ -44,6 +43,14 @@ function App() {
   
   // Help dialog state
   const [helpDialogOpen, setHelpDialogOpen] = useState(false)
+  
+  // References for manual resize functionality
+  const containerRef = useRef<HTMLDivElement>(null)
+  const chatPanelRef = useRef<HTMLDivElement>(null)
+  const controlsPanelRef = useRef<HTMLDivElement>(null)
+  const isDraggingRef = useRef<boolean>(false)
+  const startXRef = useRef<number>(0)
+  const startWidthsRef = useRef<{chat: number, controls: number}>({chat: 0, controls: 0})
 
   // Save sizes when they change (only when expanded)
   useEffect(() => {
@@ -64,6 +71,53 @@ function App() {
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed)
   }
+  
+  // Handle manual resize functionality
+  const startResize = (e: React.MouseEvent) => {
+    if (isCollapsed) return;
+    
+    e.preventDefault();
+    isDraggingRef.current = true;
+    startXRef.current = e.clientX;
+    
+    if (chatPanelRef.current && controlsPanelRef.current) {
+      startWidthsRef.current = {
+        chat: chatPanelRef.current.offsetWidth,
+        controls: controlsPanelRef.current.offsetWidth
+      };
+    }
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', stopResize);
+  };
+  
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDraggingRef.current || isCollapsed) return;
+    
+    const containerWidth = containerRef.current?.offsetWidth || 0;
+    if (!containerWidth) return;
+    
+    const deltaX = e.clientX - startXRef.current;
+    
+    const newChatWidth = startWidthsRef.current.chat + deltaX;
+    const newControlsWidth = startWidthsRef.current.controls - deltaX;
+    
+    // Set minimum widths to prevent panels from becoming too small
+    const minWidth = 250;
+    if (newChatWidth < minWidth || newControlsWidth < minWidth) return;
+    
+    // Calculate new percentage sizes
+    const newChatSize = (newChatWidth / containerWidth) * 100;
+    const newControlsSize = (newControlsWidth / containerWidth) * 100;
+    
+    setSizes([newChatSize, newControlsSize]);
+  };
+  
+  const stopResize = () => {
+    isDraggingRef.current = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', stopResize);
+  };
   
   return (
     <VariantProvider>
@@ -103,49 +157,43 @@ function App() {
               <ConnectionStatus />
             </div>
             
-            {isCollapsed ? (
-              // When collapsed, use a fixed layout with CSS
-              <div className="flex-1 flex overflow-hidden">
-                <div className="h-full flex-1">
-                  <Chat />
-                </div>
-                <div className="h-full border-l bg-background" style={{ width: `${COLLAPSED_WIDTH}px`, flexShrink: 0 }}>
-                  <Controls 
-                    variantId={currentTestId}
-                    isCollapsed={isCollapsed}
-                    onToggleCollapse={toggleSidebar}
-                  />
-                </div>
-              </div>
-            ) : (
-              // When expanded, use the Split component
-              <Split 
-                className="flex-1 flex overflow-hidden split"
-                sizes={sizes}
-                minSize={[400, 400]}
-                snapOffset={50}
-                onDragEnd={(newSizes) => {
-                  setSizes(newSizes)
+            {/* Consistent layout structure regardless of collapsed state */}
+            <div ref={containerRef} className="flex-1 flex overflow-hidden">
+              <div 
+                ref={chatPanelRef}
+                className="h-full transition-all duration-300 ease-in-out" 
+                style={{ 
+                  flexGrow: 1, 
+                  flexBasis: isCollapsed ? 'calc(100% - 60px)' : `${sizes[0]}%` 
                 }}
-                gutterSize={4}
-                gutterStyle={() => ({
-                  backgroundColor: 'hsl(var(--border))',
-                  width: '4px',
-                  cursor: 'col-resize'
-                })}
               >
-                <div className="h-full">
-                  <Chat />
-                </div>
-                <div className="h-full">
-                  <Controls 
-                    variantId={currentTestId}
-                    isCollapsed={isCollapsed}
-                    onToggleCollapse={toggleSidebar}
-                  />
-                </div>
-              </Split>
-            )}
+                <Chat />
+              </div>
+              
+              <div 
+                ref={controlsPanelRef}
+                className={`h-full border-l bg-background transition-all duration-300 ease-in-out ${isCollapsed ? 'controls-collapsed' : 'controls-expanded'}`}
+                style={{ 
+                  width: isCollapsed ? `${COLLAPSED_WIDTH}px` : 'auto',
+                  flexShrink: 0,
+                  flexBasis: isCollapsed ? 'auto' : `${sizes[1]}%`
+                }}
+              >
+                <Controls 
+                  variantId={currentTestId}
+                  isCollapsed={isCollapsed}
+                  onToggleCollapse={toggleSidebar}
+                />
+              </div>
+              
+              {/* Only show the gutter when expanded */}
+              {!isCollapsed && (
+                <div
+                  className="gutter-handle bg-border hover:bg-primary/20 cursor-col-resize transition-colors"
+                  onMouseDown={startResize}
+                ></div>
+              )}
+            </div>
           </div>
         </TestBenchProvider>
       </ActivatedFeatureProvider>

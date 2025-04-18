@@ -120,7 +120,7 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
           className="w-full h-full border-2 hover:border-primary cursor-pointer p-6 hover:bg-accent/50 transition-colors"
           onClick={handleSelectOriginal}
         >
-          <div className="mb-2 text-sm font-medium text-center text-muted-foreground">Original Response</div>
+          <div className="mb-2 text-sm font-medium text-center text-muted-foreground uppercase">Original Response</div>
           <div className="prose prose-base max-w-none">
             <ReactMarkdown>
               {originalResponse}
@@ -133,7 +133,7 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
           className="w-full h-full border-2 hover:border-primary cursor-pointer p-6 hover:bg-accent/50 transition-colors"
           onClick={handleSelectSteered}
         >
-          <div className="mb-2 text-sm font-medium text-center text-muted-foreground">Steered Response</div>
+          <div className="mb-2 text-sm font-medium text-center text-muted-foreground uppercase">Steered Response</div>
           <div className="prose prose-base max-w-none">
             <ReactMarkdown>
               {steeredResponse}

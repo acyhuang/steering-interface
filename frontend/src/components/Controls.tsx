@@ -63,46 +63,6 @@ function AutoSteerToggle({ enabled, onToggle }: AutoSteerToggleProps) {
   );
 }
 
-// New component for the collapsed controls view
-function CollapsedControls({ 
-  autoSteerEnabled, 
-  modifiedCount, 
-  onToggleCollapse 
-}: { 
-  autoSteerEnabled: boolean; 
-  modifiedCount: number;
-  onToggleCollapse?: () => void;
-}) {
-  return (
-    <div className="h-full w-full flex flex-col items-center py-4 border-l bg-background">
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        onClick={onToggleCollapse}
-        className="mb-6" 
-        aria-label="Expand controls"
-      >
-        <PanelRightOpen className="h-5 w-5" />
-      </Button>
-
-      {/* Auto-steer indicator */}
-      <div className="flex flex-col items-center pb-16 mb-6">
-        <div className={`w-3 h-3 rounded-full ${autoSteerEnabled ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-        <div className="relative">
-          <span className="text-xs absolute whitespace-nowrap" style={{ transform: 'rotate(90deg)', transformOrigin: 'left center', left: 0, top: 0 }}>Auto-steer</span>
-        </div>
-      </div>
-
-      {/* Modified features count */}
-      {modifiedCount > 0 && (
-        <Badge variant="secondary" className="mb-6">
-          {modifiedCount}
-        </Badge>
-      )}
-    </div>
-  );
-}
-
 export function Controls({ variantId = "default", isCollapsed = false, onToggleCollapse }: ControlsProps) {
   const logger = useLogger('Controls')
   const { activeFeatures, featureClusters, isLoading: isLoadingFeatures } = useFeatureActivations();
@@ -381,80 +341,102 @@ export function Controls({ variantId = "default", isCollapsed = false, onToggleC
     ? "calc(100vh - 400px)" // Reduced height when editor is visible
     : "calc(100vh - 280px)"; // Original height
 
-  // If collapsed, render the collapsed view instead
-  if (isCollapsed) {
-    return (
-      <CollapsedControls 
-        autoSteerEnabled={autoSteerEnabled}
-        modifiedCount={modifiedCount}
-        onToggleCollapse={onToggleCollapse}
-      />
-    );
-  }
-
   return (
-    <div className="h-full p-2">
-      <div className="flex flex-col h-full gap-2">
-        <div className="flex justify-between items-center gap-1">
-          <h2 className="text-lg font-semibold">Steering Controls</h2>
-          <div className="flex items-center gap-2">
-            <AutoSteerToggle 
-              enabled={autoSteerEnabled}
-              onToggle={handleAutoSteerToggle}
-            />
-            
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={onToggleCollapse}
-              className="rounded-full" 
-              aria-label="Collapse controls"
-            >
-              <PanelRightClose className="h-5 w-5" />
-            </Button>
+    <div className={`h-full ${isCollapsed ? 'controls-collapsed w-full' : 'controls-expanded'}`}>
+      {/* Collapsed view */}
+      {isCollapsed && (
+        <div className="h-full flex flex-col items-center py-4 max-w-full">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onToggleCollapse}
+            className="mb-6" 
+            aria-label="Expand controls"
+          >
+            <PanelRightOpen className="h-5 w-5" />
+          </Button>
+
+          {/* Auto-steer indicator */}
+          <div className="flex flex-col items-center pb-16 mb-6">
+            <div className={`w-3 h-3 rounded-full ${autoSteerEnabled ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+            <div className="relative">
+              <span className="text-xs absolute whitespace-nowrap" style={{ transform: 'rotate(90deg)', transformOrigin: 'left center', left: 0, top: 0 }}>Auto-steer</span>
+            </div>
           </div>
+
+          {/* Modified features count */}
+          {modifiedCount > 0 && (
+            <Badge variant="secondary" className="mb-6">
+              {modifiedCount}
+            </Badge>
+          )}
         </div>
+      )}
 
-        <Tabs 
-          defaultValue="activated" 
-          className="flex-1 flex flex-col min-h-0"
-          value={selectedTab}
-          onValueChange={setSelectedTab}
-        >
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="activated">Activated</TabsTrigger>
-            <TabsTrigger value="modified">Modified</TabsTrigger>
-            <TabsTrigger value="search">Search</TabsTrigger>
-          </TabsList>
-
-          <div className="flex-1 min-h-0 mt-2 flex flex-col">
-            <ScrollArea className="flex-1" style={{ height: scrollAreaHeight, transition: "height 0.2s ease" }}>
-              <TabsContent value="activated" className="m-0 pr-2">
-                {renderActivatedFeatures()}
-              </TabsContent>
-
-              <TabsContent value="modified" className="m-0">
-                {renderModifiedFeatures()}
-              </TabsContent>
-
-              <TabsContent value="search" className="m-0">
-                {renderSearchBar()}
-                <div className="px-0 pt-2">
-                  {renderSearchContent()}
-                </div>
-              </TabsContent>
-            </ScrollArea>
-
-            {/* Feature Editor now positioned below the scroll area */}
-            {selectedFeature && (
-              <FeatureEditor
-                feature={selectedFeature}
-                onSteer={handleSteer}
-                onClose={handleCloseEditor}
+      {/* Expanded view - using visibility and position to handle transitions */}
+      <div className={`h-full p-2 ${isCollapsed ? 'invisible absolute left-0 w-0 overflow-hidden' : 'visible w-full'}`}>
+        <div className="flex flex-col h-full gap-2">
+          <div className="flex justify-between items-center gap-1">
+            <h2 className="text-lg font-semibold">Steering Controls</h2>
+            <div className="flex items-center gap-2">
+              <AutoSteerToggle 
+                enabled={autoSteerEnabled}
+                onToggle={handleAutoSteerToggle}
               />
-            )}
+              
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={onToggleCollapse}
+                className="rounded-full" 
+                aria-label="Collapse controls"
+              >
+                <PanelRightClose className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
-        </Tabs>
+
+          <Tabs 
+            defaultValue="activated" 
+            className="flex-1 flex flex-col min-h-0"
+            value={selectedTab}
+            onValueChange={setSelectedTab}
+          >
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="activated">Activated</TabsTrigger>
+              <TabsTrigger value="modified">Modified</TabsTrigger>
+              <TabsTrigger value="search">Search</TabsTrigger>
+            </TabsList>
+
+            <div className="flex-1 min-h-0 mt-2 flex flex-col">
+              <ScrollArea className="flex-1" style={{ height: scrollAreaHeight, transition: "height 0.2s ease" }}>
+                <TabsContent value="activated" className="m-0 pr-2">
+                  {renderActivatedFeatures()}
+                </TabsContent>
+
+                <TabsContent value="modified" className="m-0">
+                  {renderModifiedFeatures()}
+                </TabsContent>
+
+                <TabsContent value="search" className="m-0">
+                  {renderSearchBar()}
+                  <div className="px-0 pt-2">
+                    {renderSearchContent()}
+                  </div>
+                </TabsContent>
+              </ScrollArea>
+
+              {/* Feature Editor now positioned below the scroll area */}
+              {selectedFeature && (
+                <FeatureEditor
+                  feature={selectedFeature}
+                  onSteer={handleSteer}
+                  onClose={handleCloseEditor}
+                />
+              )}
+            </div>
+          </Tabs>
+        </div>
       </div>
     </div>
   );
