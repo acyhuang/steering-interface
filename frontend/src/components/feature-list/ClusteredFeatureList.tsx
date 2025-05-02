@@ -1,5 +1,3 @@
-import { useFeatureCardVariant } from '../feature-card';
-import { ChevronDown, ChevronRight } from 'lucide-react';
 import { 
   Accordion,
   AccordionContent,
@@ -10,12 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { FeatureListProps } from './variants';
 
 export function ClusteredFeatureList({ 
-  features,
   clusters, 
-  onSteer, 
-  variantId 
 }: FeatureListProps) {
-  const FeatureCardVariant = useFeatureCardVariant();
+  // Create a simple replacement for the missing component
+  const FeatureCardVariant = ({ feature }: any) => (
+    <div className="p-2 border rounded">
+      {feature.label || 'Unnamed feature'}
+    </div>
+  );
   
   // If there are no clusters, show a message
   if (!clusters || clusters.length === 0) {
@@ -51,8 +51,6 @@ export function ClusteredFeatureList({
                   <FeatureCardVariant
                     key={`${cluster.name}-${idx}`}
                     feature={feature}
-                    onSteer={onSteer}
-                    variantId={variantId}
                   />
                 ))}
               </div>

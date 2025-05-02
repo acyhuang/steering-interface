@@ -1,6 +1,5 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
-import { createLogger } from '@/lib/logger';
 
 // Mock the logger
 vi.mock('@/lib/logger', () => ({

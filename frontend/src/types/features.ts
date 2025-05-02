@@ -1,5 +1,3 @@
-import { ChatMessage } from './chat';
-
 export interface ModifiedFeature {
   label: string;
   value: number;

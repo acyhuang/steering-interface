@@ -33,7 +33,6 @@ export const featureListTests = {
 
 export function useFeatureListVariant(): ComponentType<FeatureListProps> {
   const clusteredComponent = useTestBench('featureList', clusteredTest);
-  const uncluseredComponent = useTestBench('featureList', uncluseredTest);
   
   return clusteredComponent;
 } 

@@ -1,12 +1,10 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 import { 
   FeatureActivation, 
-  FeatureCluster,
-  ClusteredFeaturesResponse
+  FeatureCluster
 } from '@/types/features';
 import { featuresApi } from '@/lib/api';
 import { createLogger } from '@/lib/logger';
-import { VariantContext } from './VariantContext';
 import { useVariant } from '@/hooks/useVariant';
 
 interface ActivatedFeatureContextType {

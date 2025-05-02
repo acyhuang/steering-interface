@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { FeatureActivation, SteerFeatureResponse } from "@/types/steering/feature";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { createLogger } from "@/lib/logger";
 import { featuresApi } from "@/lib/api";
 import { useVariant } from "@/hooks/useVariant";

@@ -1,47 +1,23 @@
 import { Input } from "./ui/input"
-import { Card } from "./ui/card"
 import { ScrollArea } from "./ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
-import { useState, useEffect, useRef } from "react"
-import { Search, AlertCircle, RefreshCcw, Info, ChevronRight, ChevronLeft, SidebarOpen, SidebarIcon, ChevronsLeftIcon, LucidePanelLeftOpen, PanelRightOpen, PanelRightClose } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Search, PanelRightOpen, PanelRightClose } from "lucide-react"
 import { Button } from "./ui/button"
 import { Switch } from "./ui/switch"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "./ui/dialog"
 import { FeatureActivation, SteerFeatureResponse } from "@/types/steering/feature"
-import { FeatureCluster } from "@/types/steering/cluster"
 import { featuresApi } from "@/lib/api"
 import { useLogger } from '@/lib/logger'
 import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext'
 import { useVariant } from '@/hooks/useVariant'
 import { FeatureTable, FeatureEditor } from './feature-row'
 import { ControlsLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui'
-import { createLogger } from "@/lib/logger"
 import { Badge } from "./ui/badge"
 
 interface ControlsProps {
   variantId?: string;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
-}
-
-interface FeatureEdit {
-  feature_id: string;
-  feature_label: string;
-  index_in_sae: number;
-  value: number;
-}
-
-interface VariantResponse {
-  base_model: string;
-  edits: FeatureEdit[];
-  scopes: any[];
 }
 
 // Auto-Steer Toggle component
@@ -67,7 +43,6 @@ export function Controls({ variantId = "default", isCollapsed = false, onToggleC
   const logger = useLogger('Controls')
   const { activeFeatures, featureClusters, isLoading: isLoadingFeatures } = useFeatureActivations();
   const { 
-    variantJson, 
     refreshVariant, 
     modifiedFeatures, 
     getAllModifiedFeatures,
@@ -90,7 +65,6 @@ export function Controls({ variantId = "default", isCollapsed = false, onToggleC
   // Computed properties for backward compatibility
   const isLoadingModified = loadingState.state === ControlsLoadingState.LOADING_MODIFIED;
   const isSearching = loadingState.state === ControlsLoadingState.SEARCHING;
-  const refreshInProgress = loadingState.state !== ControlsLoadingState.IDLE;
 
   // Get count of modified features
   const modifiedCount = localModifiedFeatures.length;
@@ -262,7 +236,6 @@ export function Controls({ variantId = "default", isCollapsed = false, onToggleC
         clusters={featureClusters}
         selectedFeature={selectedFeature}
         onSelectFeature={handleSelectFeature}
-        onSteer={handleSteer}
       />
     );
   };
@@ -285,7 +258,6 @@ export function Controls({ variantId = "default", isCollapsed = false, onToggleC
         features={localModifiedFeatures}
         selectedFeature={selectedFeature}
         onSelectFeature={handleSelectFeature}
-        onSteer={handleSteer}
       />
     );
   };
@@ -300,7 +272,6 @@ export function Controls({ variantId = "default", isCollapsed = false, onToggleC
             features={searchResults}
             selectedFeature={selectedFeature}
             onSelectFeature={handleSelectFeature}
-            onSteer={handleSteer}
           />
         ) : searchQuery ? (
           <div className="text-sm text-gray-500">

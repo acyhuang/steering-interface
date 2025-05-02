@@ -67,7 +67,7 @@ export function VariantProvider({
   defaultSessionId = 'default_session'
 }: VariantProviderProps) {
   const [variantId, setVariantId] = useState<string>(defaultVariantId);
-  const [sessionId, setSessionId] = useState<string>(defaultSessionId);
+  const [sessionId] = useState<string>(defaultSessionId);
   const [variantJson, setVariantJson] = useState<any | null>(null);
   
   // New state for steering comparison

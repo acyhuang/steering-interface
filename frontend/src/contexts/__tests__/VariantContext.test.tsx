@@ -1,6 +1,5 @@
 // Import mocks first to ensure proper hoisting
 import './__mocks__';
-import React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useVariant } from '../../hooks/useVariant';

@@ -39,7 +39,7 @@ function App() {
   // Track if controls panel is collapsed
   const [isCollapsed, setIsCollapsed] = useState(false)
 
-  const [currentTestId, setCurrentTestId] = useState<string>("default")
+  const [currentTestId] = useState<string>("default")
   
   // Help dialog state
   const [helpDialogOpen, setHelpDialogOpen] = useState(false)
@@ -63,10 +63,6 @@ function App() {
     logger.info('Application initialized')
   }, [])
 
-  const handleTestChange = (testId: string) => {
-    setCurrentTestId(testId)
-  }
-  
   // Toggle sidebar collapsed state
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed)

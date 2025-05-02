@@ -51,4 +51,47 @@ uvicorn src.main:app --reload
 
 - Format code: `black .`
 - Sort imports: `isort .`
-- Type checking: `mypy .` 
+- Type checking: `mypy .`
+
+## Vercel Deployment
+
+The backend is configured to be deployed as a serverless function on Vercel. The deployment uses the following structure:
+
+- `/api/index.py`: Vercel serverless function adapter for FastAPI
+- `/api/requirements.txt`: Dependencies for the Vercel deployment
+- `/vercel.json`: Configuration for Vercel deployment
+
+### Deployment Configuration
+
+The deployment implements several key security features:
+
+1. **API Key Protection**: API keys are stored as Vercel environment variables and are never exposed to the frontend
+2. **Rate Limiting**: IP-based rate limiting is implemented to prevent API abuse (100 requests per IP per hour)
+3. **CORS Protection**: CORS is configured to only allow requests from approved frontend domains
+
+### Environment Variables
+
+The following environment variables must be set in the Vercel project settings:
+
+- `EMBER_API_KEY`: The API key for the Ember API
+- `OPENAI_API_KEY`: The API key for OpenAI API (used for clustering)
+- `APP_ENV`: The environment to run in (`development`, `staging`, or `production`)
+
+### Deployment Commands
+
+```bash
+# Deploy to Vercel
+vercel
+
+# Deploy to production
+vercel --prod
+```
+
+### Security Considerations
+
+The API key proxy pattern implemented in this project ensures that:
+
+1. API keys are never exposed to the client-side code
+2. All API requests are proxied through our backend
+3. Rate limiting protects against abuse
+4. CORS configuration prevents unauthorized access 

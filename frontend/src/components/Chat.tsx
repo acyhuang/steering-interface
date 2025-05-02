@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
-import { Card } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { ChatMessage } from '@/types/conversation';
 import { chatApi, featuresApi } from '@/lib/api';
@@ -29,7 +28,6 @@ export function Chat({ onVariantChange }: ChatProps) {
     setIsComparingResponses,
     currentResponse,
     autoSteerEnabled,
-    pendingFeatures,
     setPendingFeatures,
     setSteeredResponse
   } = useVariant();
@@ -44,7 +42,6 @@ export function Chat({ onVariantChange }: ChatProps) {
   const [showSuggestedPrompts, setShowSuggestedPrompts] = useState(true);
 
   const isLoading = loadingState.state !== ChatLoadingState.IDLE;
-  const isRegenerating = loadingState.state === ChatLoadingState.REGENERATING;
 
   useEffect(() => {
     if (isComparingResponses) {
@@ -183,11 +180,6 @@ export function Chat({ onVariantChange }: ChatProps) {
         const originalAssistantMessage: ChatMessage = {
           role: 'assistant',
           content: response.auto_steer_result.original_content
-        };
-        
-        const steeredAssistantMessage: ChatMessage = {
-          role: 'assistant',
-          content: response.auto_steer_result.steered_content
         };
         
         // Update message list with original response initially

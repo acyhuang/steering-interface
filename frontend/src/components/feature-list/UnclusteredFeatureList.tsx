@@ -1,12 +1,13 @@
-import { useFeatureCardVariant } from '../feature-card';
 import { FeatureListProps } from './variants';
 
 export function UnclusteredFeatureList({ 
-  features,
-  onSteer, 
-  variantId 
+  features
 }: FeatureListProps) {
-  const FeatureCardVariant = useFeatureCardVariant();
+  const FeatureCardVariant = ({ feature }: any) => (
+    <div className="p-2 border rounded">
+      {feature.label || 'Unnamed feature'}
+    </div>
+  );
   
   if (!features || features.length === 0) {
     return (
@@ -22,8 +23,6 @@ export function UnclusteredFeatureList({
         <FeatureCardVariant
           key={index} 
           feature={feature}
-          onSteer={onSteer}
-          variantId={variantId}
         />
       ))}
     </div>

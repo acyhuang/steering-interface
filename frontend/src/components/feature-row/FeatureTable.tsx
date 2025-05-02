@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FeatureActivation, SteerFeatureResponse } from "@/types/steering/feature";
+import { FeatureActivation } from "@/types/steering/feature";
 import { FeatureCluster } from "@/types/steering/cluster";
 import { FeatureRow } from "./FeatureRow";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -9,15 +9,13 @@ interface FeatureTableProps {
   clusters?: FeatureCluster[];
   selectedFeature: FeatureActivation | null;
   onSelectFeature: (feature: FeatureActivation) => void;
-  onSteer?: (response: SteerFeatureResponse) => void;
 }
 
 export function FeatureTable({
   features,
   clusters,
   selectedFeature,
-  onSelectFeature,
-  onSteer
+  onSelectFeature
 }: FeatureTableProps) {
   // Track which clusters are expanded
   const [expandedClusters, setExpandedClusters] = useState<Record<string, boolean>>({});

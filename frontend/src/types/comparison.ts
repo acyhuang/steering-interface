@@ -1,4 +1,4 @@
-import { ChatMessage, ChatResponse, ChatRequest } from './chat';
+import { ChatMessage } from './chat';
 
 export interface PendingFeature {
   featureId: string;
