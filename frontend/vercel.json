@@ -8,7 +8,20 @@
   ],
   "build": {
     "env": {
-      "VITE_TSCONFIG_PATH": "tsconfig.build.json"
+      "VITE_TSCONFIG_PATH": "tsconfig.build.json",
+      "NODE_OPTIONS": "--max-old-space-size=4096",
+      "VITE_USE_PRODUCTION_CONFIG": "true"
     }
-  }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    }
+  ]
 } 
