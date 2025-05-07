@@ -5,5 +5,10 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "build": {
+    "env": {
+      "VITE_TSCONFIG_PATH": "tsconfig.build.json"
+    }
+  }
 } 
