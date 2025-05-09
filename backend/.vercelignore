@@ -1,0 +1,17 @@
+# Dependencies not needed in production
+__pycache__/
+.pytest_cache/
+tests/
+.git/
+.gitignore
+
+# Poetry files (since we're using requirements.txt for deployment)
+poetry.lock
+pyproject.toml
+
+# Development files
+Makefile
+*.pyc
+.venv/
+.env.local
+.coverage 
