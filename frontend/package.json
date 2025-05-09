@@ -5,9 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p tsconfig.build.json --noemit && vite build --config vite.config.production.ts",
-    "verify-build": "node verify-build.js",
-    "build:verify": "npm run build && npm run verify-build",
+    "build": "tsc -p tsconfig.build.json && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",

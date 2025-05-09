@@ -15,8 +15,9 @@ coverage
 
 # Production
 build
-dist
-dist-ssr
+# Commenting out dist directories to allow for pre-built deployment
+# dist
+# dist-ssr
 
 # Editor directories and files
 .idea
@@ -56,7 +57,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
+# dist/  # Commented out for pre-built deployment
 downloads/
 eggs/
 .eggs/

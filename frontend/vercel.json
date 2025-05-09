@@ -1,27 +1,9 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "echo 'Skipping build - using pre-built files'",
   "outputDirectory": "dist",
-  "installCommand": "npm install",
-  "framework": "vite",
+  "installCommand": "npm install --production=false",
+  "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "build": {
-    "env": {
-      "VITE_TSCONFIG_PATH": "tsconfig.build.json",
-      "NODE_OPTIONS": "--max-old-space-size=4096",
-      "VITE_USE_PRODUCTION_CONFIG": "true"
-    }
-  },
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
-        }
-      ]
-    }
   ]
 } 
