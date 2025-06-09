@@ -44,7 +44,7 @@ app.add_middleware(
     RateLimiter,
     max_requests=settings.RATE_LIMIT_MAX_REQUESTS,
     time_window=settings.RATE_LIMIT_WINDOW_SECONDS,
-    exclude_paths=["/health", "/api/v1/health", "/docs", "/openapi.json"]
+    exclude_paths=["/health", "/docs", "/openapi.json"]
 )
 
 # Include routers
