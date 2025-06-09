@@ -31,11 +31,24 @@ pip install -r requirements.txt
 
 ## Environment Variables
 
-Create a `.env` file in the backend directory:
+Create a `.env` file in the backend directory (see `.env.example` for all options):
 
 ```
+# Required
 EMBER_API_KEY=your_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+
+# CORS Configuration (for production deployments)
+FRONTEND_URL=https://your-frontend-domain.vercel.app
 ```
+
+### CORS Configuration
+
+The backend uses a flexible CORS configuration system:
+
+1. **FRONTEND_URL** (recommended): Set this environment variable to your frontend URL for single-origin setups
+2. **CORS_ORIGINS**: Alternative for multiple allowed origins (comma-separated)
+3. **Environment fallbacks**: Automatic defaults based on APP_ENV (development uses localhost:5173)
 
 ## Running the Server
 
@@ -75,7 +88,8 @@ The following environment variables must be set in the Vercel project settings:
 
 - `EMBER_API_KEY`: The API key for the Ember API
 - `OPENAI_API_KEY`: The API key for OpenAI API (used for clustering)
-- `APP_ENV`: The environment to run in (`development`, `staging`, or `production`)
+- `FRONTEND_URL`: The URL of your frontend deployment (e.g., `https://your-frontend.vercel.app`) - **recommended approach**
+- `APP_ENV`: The environment to run in (`development`, `staging`, or `production`) - optional, auto-detected on Vercel
 
 ### Deployment Commands
 

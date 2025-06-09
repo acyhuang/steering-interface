@@ -21,8 +21,9 @@ class Settings(BaseSettings):
     APP_ENV: Environment = Environment.DEVELOPMENT
     LOG_LEVEL: Optional[str] = None  # If None, will be determined by environment
     
-    # CORS settings
-    CORS_ORIGINS: List[str] = ["http://localhost:5173"]  # Default for development
+    # CORS settings - preferred approach is to set FRONTEND_URL in Vercel env vars
+    FRONTEND_URL: Optional[str] = None  # Set this in Vercel environment variables
+    CORS_ORIGINS: List[str] = []  # Empty default, will use FRONTEND_URL or fallback logic
     
     # Rate limiting
     RATE_LIMIT_MAX_REQUESTS: int = 100
@@ -63,21 +64,27 @@ class Settings(BaseSettings):
         
     @property
     def get_cors_origins(self) -> List[str]:
-        """Get CORS allowed origins based on environment."""
-        # If CORS_ORIGINS is explicitly set, use that
+        """Get CORS allowed origins based on environment.
+        
+        Priority:
+        1. FRONTEND_URL environment variable (preferred for Vercel deployments)
+        2. CORS_ORIGINS environment variable (for multiple origins)
+        3. Environment-specific fallback defaults
+        """
+        # First priority: FRONTEND_URL environment variable
+        if self.FRONTEND_URL:
+            return [self.FRONTEND_URL]
+            
+        # Second priority: CORS_ORIGINS environment variable (for multiple origins)
         if self.CORS_ORIGINS and len(self.CORS_ORIGINS) > 0:
             return self.CORS_ORIGINS
             
-        # Otherwise, use environment-specific defaults
-        if self.APP_ENV == Environment.PRODUCTION:
-            return ["https://steering-interface.vercel.app", "https://steering-interface-frontend.vercel.app"]
-        elif self.APP_ENV == Environment.STAGING:
-            return [
-                "https://steering-interface-staging.vercel.app",
-                "https://steering-interface-*.vercel.app"  # For preview deployments
-            ]
-        else:
-            return ["http://localhost:5173"]  # Development
+        # Fallback to environment-specific defaults (mainly for local development)
+        return {
+            Environment.PRODUCTION: ["https://steering-interface.vercel.app"],  # Fallback if FRONTEND_URL not set
+            Environment.STAGING: ["https://steering-interface-preview.vercel.app"],  # Fallback for staging
+            Environment.DEVELOPMENT: ["http://localhost:5173"]  # Local development default
+        }[self.APP_ENV]
     
     @property
     def is_vercel_deployment(self) -> bool:
