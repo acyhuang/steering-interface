@@ -70,7 +70,7 @@ class Settings(BaseSettings):
             
         # Otherwise, use environment-specific defaults
         if self.APP_ENV == Environment.PRODUCTION:
-            return ["https://steering-interface.vercel.app"]
+            return ["https://steering-interface.vercel.app", "https://steering-interface-frontend.vercel.app"]
         elif self.APP_ENV == Environment.STAGING:
             return [
                 "https://steering-interface-staging.vercel.app",
