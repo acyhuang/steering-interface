@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     APP_ENV: Environment = Environment.DEVELOPMENT
     LOG_LEVEL: Optional[str] = None  # If None, will be determined by environment
     
-    # CORS settings - preferred approach is to set FRONTEND_URL in Vercel env vars
+    # CORS settings - use FRONTEND_URL environment variable in Vercel deployments
     FRONTEND_URL: Optional[str] = None  # Set this in Vercel environment variables
-    CORS_ORIGINS: List[str] = []  # Empty default, will use FRONTEND_URL or fallback logic
+    CORS_ORIGINS: List[str] = []  # For multiple origins if needed
     
     # Rate limiting
     RATE_LIMIT_MAX_REQUESTS: int = 100
@@ -69,7 +69,7 @@ class Settings(BaseSettings):
         Priority:
         1. FRONTEND_URL environment variable (preferred for Vercel deployments)
         2. CORS_ORIGINS environment variable (for multiple origins)
-        3. Environment-specific fallback defaults
+        3. Local development fallback only
         """
         # First priority: FRONTEND_URL environment variable
         if self.FRONTEND_URL:
@@ -79,12 +79,15 @@ class Settings(BaseSettings):
         if self.CORS_ORIGINS and len(self.CORS_ORIGINS) > 0:
             return self.CORS_ORIGINS
             
-        # Fallback to environment-specific defaults (mainly for local development)
-        return {
-            Environment.PRODUCTION: ["https://steering-interface.vercel.app"],  # Fallback if FRONTEND_URL not set
-            Environment.STAGING: ["https://steering-interface-preview.vercel.app"],  # Fallback for staging
-            Environment.DEVELOPMENT: ["http://localhost:5173"]  # Local development default
-        }[self.APP_ENV]
+        # Fallback only for local development
+        if self.APP_ENV == Environment.DEVELOPMENT:
+            return ["http://localhost:5173"]
+            
+        # If no environment variables are set in production/staging, raise an error
+        raise ValueError(
+            f"FRONTEND_URL must be set for {self.APP_ENV} environment. "
+            "Set this in your Vercel project environment variables."
+        )
     
     @property
     def is_vercel_deployment(self) -> bool:
