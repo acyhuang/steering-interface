@@ -1,4 +1,4 @@
-# v0 Design Document
+# Design Document
 
 ## Problem Statement
 We need a simple GUI application that allows users to:
