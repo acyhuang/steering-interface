@@ -3,8 +3,6 @@ import { ConnectionStatus } from "@/components/ConnectionStatus"
 import { Controls } from "@/components/Controls"
 import { useEffect, useState, useRef } from "react"
 import { createLogger } from "@/lib/logger"
-import { TestBenchProvider } from "@/lib/testbench/TestBenchProvider"
-import { TestBenchPanel } from "@/lib/testbench/TestBenchPanel"
 import { ActivatedFeatureProvider } from "@/contexts/ActivatedFeatureContext"
 import { VariantProvider } from "./contexts/VariantContext"
 import { HelpCircle } from "lucide-react"
@@ -39,7 +37,6 @@ function App() {
   // Track if controls panel is collapsed
   const [isCollapsed, setIsCollapsed] = useState(false)
 
-  const [currentTestId, setCurrentTestId] = useState<string>("default")
   
   // Help dialog state
   const [helpDialogOpen, setHelpDialogOpen] = useState(false)
@@ -63,9 +60,6 @@ function App() {
     logger.info('Application initialized')
   }, [])
 
-  const handleTestChange = (testId: string) => {
-    setCurrentTestId(testId)
-  }
   
   // Toggle sidebar collapsed state
   const toggleSidebar = () => {
@@ -122,11 +116,9 @@ function App() {
   return (
     <VariantProvider>
       <ActivatedFeatureProvider>
-        <TestBenchProvider>
-          <div className="h-screen flex flex-col">
-            <div className="p-2 flex justify-between items-center border-b">
-              <div className="flex items-center gap-2">
-                <TestBenchPanel />
+        <div className="h-screen flex flex-col">
+          <div className="p-2 flex justify-between items-center border-b">
+            <div className="flex items-center gap-2">
                 <Button 
                   variant="ghost" 
                   size="icon" 
@@ -180,7 +172,6 @@ function App() {
                 }}
               >
                 <Controls 
-                  variantId={currentTestId}
                   isCollapsed={isCollapsed}
                   onToggleCollapse={toggleSidebar}
                 />
@@ -193,9 +184,8 @@ function App() {
                   onMouseDown={startResize}
                 ></div>
               )}
-            </div>
           </div>
-        </TestBenchProvider>
+        </div>
       </ActivatedFeatureProvider>
     </VariantProvider>
   )

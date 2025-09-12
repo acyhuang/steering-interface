@@ -148,11 +148,6 @@ The application uses several context providers to manage different aspects of ap
 - Provides methods for applying, confirming, and canceling steering actions
 - Implemented in `frontend/src/contexts/VariantContext.tsx`
 
-**TestBenchProvider:**
-- Manages component testing configurations
-- Tracks active tests and test definitions
-- Allows components to register tests and manage test state
-- Implemented in `frontend/src/lib/testbench/TestBenchProvider.tsx`
 
 ### State Flow Architecture
 
@@ -162,8 +157,7 @@ The application's state flow follows a clear hierarchy:
 graph TD
     A[App Component] --> B[FeatureProvider]
     B --> V[VariantProvider]
-    V --> C[TestBenchProvider]
-    C --> D[Component Tree]
+    V --> D[Component Tree]
     D --> E[Chat Component]
     D --> F[Controls Component]
     D --> G[ComparisonView Component]
