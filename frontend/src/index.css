@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -66,25 +67,6 @@
   }
 }
 
-/* Add these styles for the split panes */
-.split {
-  display: flex;
-  flex-direction: row;
-}
-
-.gutter {
-  background-color: #e5e7eb;
-  background-repeat: no-repeat;
-  background-position: 50%;
-}
-
-.gutter:hover {
-  background-color: #d1d5db;
-}
-
-.gutter.gutter-horizontal {
-  cursor: col-resize;
-}
 
 
 

@@ -2,7 +2,6 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
-import './styles/controls.css'
 import { Logger } from './logging/logger'
 import { LoggerProvider } from './logging/context'
 

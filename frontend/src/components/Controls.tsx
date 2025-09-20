@@ -1,80 +1,50 @@
 import { Input } from "./ui/input"
-import { Card } from "./ui/card"
 import { ScrollArea } from "./ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs"
-import { useState, useEffect, useRef } from "react"
-import { Search, AlertCircle, RefreshCcw, Info, ChevronRight, ChevronLeft, SidebarOpen, SidebarIcon, ChevronsLeftIcon, LucidePanelLeftOpen, PanelRightOpen, PanelRightClose } from "lucide-react"
+import { useState, useEffect} from "react"
+import { Search } from "lucide-react"
 import { Button } from "./ui/button"
 import { Switch } from "./ui/switch"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+
 } from "./ui/dialog"
 import { FeatureActivation, SteerFeatureResponse } from "@/types/steering/feature"
-import { FeatureCluster } from "@/types/steering/cluster"
 import { featuresApi } from "@/lib/api"
 import { useLogger } from '@/lib/logger'
 import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext'
 import { useVariant } from '@/hooks/useVariant'
 import { FeatureTable, FeatureEditor } from './feature-row'
 import { ControlsLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui'
-import { createLogger } from "@/lib/logger"
-import { Badge } from "./ui/badge"
+import { HelpCircle } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+
 
 interface ControlsProps {
   variantId?: string;
-  isCollapsed?: boolean;
-  onToggleCollapse?: () => void;
 }
 
-interface FeatureEdit {
-  feature_id: string;
-  feature_label: string;
-  index_in_sae: number;
-  value: number;
-}
 
-interface VariantResponse {
-  base_model: string;
-  edits: FeatureEdit[];
-  scopes: any[];
-}
 
-// Auto-Steer Toggle component
-interface AutoSteerToggleProps {
-  enabled: boolean;
-  onToggle: (enabled: boolean) => void;
-}
-
-function AutoSteerToggle({ enabled, onToggle }: AutoSteerToggleProps) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm font-medium">Auto-Steer</span>
-      <Switch 
-        checked={enabled} 
-        onCheckedChange={onToggle} 
-        aria-label="Toggle Auto-Steer"
-      />
-    </div>
-  );
-}
-
-export function Controls({ variantId = "default", isCollapsed = false, onToggleCollapse }: ControlsProps) {
+export function Controls({ variantId = "default" }: ControlsProps) {
   const logger = useLogger('Controls')
   const { activeFeatures, featureClusters, isLoading: isLoadingFeatures } = useFeatureActivations();
   const { 
-    variantJson, 
     refreshVariant, 
     modifiedFeatures, 
     getAllModifiedFeatures,
     autoSteerEnabled,
     setAutoSteerEnabled
   } = useVariant();
-  
+    
+  // Help dialog state
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false)
+
   const [searchQuery, setSearchQuery] = useState("")
   const [localModifiedFeatures, setLocalModifiedFeatures] = useState<FeatureActivation[]>([])
   // Replace multiple loading states with a single state machine
@@ -90,10 +60,6 @@ export function Controls({ variantId = "default", isCollapsed = false, onToggleC
   // Computed properties for backward compatibility
   const isLoadingModified = loadingState.state === ControlsLoadingState.LOADING_MODIFIED;
   const isSearching = loadingState.state === ControlsLoadingState.SEARCHING;
-  const refreshInProgress = loadingState.state !== ControlsLoadingState.IDLE;
-
-  // Get count of modified features
-  const modifiedCount = localModifiedFeatures.length;
 
   // Process modifiedFeatures from context to local state
   useEffect(() => {
@@ -342,57 +308,53 @@ export function Controls({ variantId = "default", isCollapsed = false, onToggleC
     : "calc(100vh - 280px)"; // Original height
 
   return (
-    <div className={`h-full ${isCollapsed ? 'controls-collapsed w-full' : 'controls-expanded'}`}>
-      {/* Collapsed view */}
-      {isCollapsed && (
-        <div className="h-full flex flex-col items-center py-4 max-w-full">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onToggleCollapse}
-            className="mb-6" 
-            aria-label="Expand controls"
-          >
-            <PanelRightOpen className="h-5 w-5" />
-          </Button>
-
-          {/* Auto-steer indicator */}
-          <div className="flex flex-col items-center pb-16 mb-6">
-            <div className={`w-3 h-3 rounded-full ${autoSteerEnabled ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-            <div className="relative">
-              <span className="text-xs absolute whitespace-nowrap" style={{ transform: 'rotate(90deg)', transformOrigin: 'left center', left: 0, top: 0 }}>Auto-steer</span>
-            </div>
-          </div>
-
-          {/* Modified features count */}
-          {modifiedCount > 0 && (
-            <Badge variant="secondary" className="mb-6">
-              {modifiedCount}
-            </Badge>
-          )}
-        </div>
-      )}
-
-      {/* Expanded view - using visibility and position to handle transitions */}
-      <div className={`h-full p-2 ${isCollapsed ? 'invisible absolute left-0 w-0 overflow-hidden' : 'visible w-full'}`}>
+    <div className="h-full">
+      <div className="h-full px-4 py-2 w-full ">
         <div className="flex flex-col h-full gap-2">
           <div className="flex justify-between items-center gap-1">
-            <h2 className="text-lg font-semibold">Steering Controls</h2>
-            <div className="flex items-center gap-2">
-              <AutoSteerToggle 
-                enabled={autoSteerEnabled}
-                onToggle={handleAutoSteerToggle}
+            <span className="text-sm font-mono text-muted-foreground">STEERING CONTROLS</span>
+            <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setHelpDialogOpen(true)}
+                  className="rounded-full" 
+                  aria-label="Help"
+                >
+                  <HelpCircle className="h-5 w-5" />
+                </Button>
+                
+                <Dialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Understanding steering controls</DialogTitle>
+                      <DialogDescription>
+                        <div className="mt-4 space-y-4 text-sm">
+                          <p>Features are internal representations of concepts that the LLM has learned. Steering controls allow you to strengthen or weaken features in the model to influence its behavior.</p>
+                          <p><span className="font-medium">Activated:</span> Features that are currently influencing the model's outputs in your conversation.</p>
+                          <p><span className="font-medium">Modified:</span> Features that have been strengthened or weakened from the model's default state.</p>
+                          <p><span className="font-medium">Search:</span> Allows you to find features by their meaning or purpose.</p>
+                          <p><span className="font-medium">Auto-steer:</span> When enabled, automatically suggests feature adjustments based on your query.</p>
+                        </div>
+                      </DialogDescription>
+                    </DialogHeader>
+                  </DialogContent>
+                </Dialog>
+          </div>
+
+          {/* Auto-Steer Section */}
+          <div className="flex items-center justify-between p-3 bg-accent rounded-lg border">
+            <div className="flex gap-4 items-center">
+              <Switch 
+                checked={autoSteerEnabled} 
+                onCheckedChange={handleAutoSteerToggle} 
+                aria-label="Toggle Auto-Steer"
               />
-              
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={onToggleCollapse}
-                className="rounded-full" 
-                aria-label="Collapse controls"
-              >
-                <PanelRightClose className="h-5 w-5" />
-              </Button>
+              <div className="items-center gap-2">
+                <span className="text-sm font-medium">Auto-Steer</span>
+                <p className="text-xs text-muted-foreground">
+                  Automatically find and adjust features based on your query
+                </p>
+              </div>
             </div>
           </div>
 

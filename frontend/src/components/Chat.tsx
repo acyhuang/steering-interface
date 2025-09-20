@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
-import { Card } from './ui/card';
+import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { ChatMessage } from '@/types/conversation';
 import { chatApi, featuresApi } from '@/lib/api';
@@ -12,6 +12,7 @@ import { ComparisonView } from './ComparisonView';
 import { SuggestedPrompts } from './SuggestedPrompts';
 import { ChatLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui';
 import ReactMarkdown from 'react-markdown';
+import { ArrowUp } from 'lucide-react';
 
 interface ChatProps {
   onVariantChange?: (variantId: string) => void;
@@ -29,7 +30,6 @@ export function Chat({ onVariantChange }: ChatProps) {
     setIsComparingResponses,
     currentResponse,
     autoSteerEnabled,
-    pendingFeatures,
     setPendingFeatures,
     setSteeredResponse
   } = useVariant();
@@ -44,7 +44,6 @@ export function Chat({ onVariantChange }: ChatProps) {
   const [showSuggestedPrompts, setShowSuggestedPrompts] = useState(true);
 
   const isLoading = loadingState.state !== ChatLoadingState.IDLE;
-  const isRegenerating = loadingState.state === ChatLoadingState.REGENERATING;
 
   useEffect(() => {
     if (isComparingResponses) {
@@ -321,14 +320,18 @@ export function Chat({ onVariantChange }: ChatProps) {
   };
 
   return (
-    <div className="flex flex-col h-full border-0">
-      <div className="p-2 border-b bg-muted/50">
-        <div className="text-sm text-muted-foreground space-y-1">
-          <div>Current Variant: <span className="font-medium">{variantId}</span></div>
-        </div>
+    <div className="relative flex flex-col h-full border-0">
+      {/* Floating badge container */}
+      <div className="absolute top-0 left-0 right-0 z-20 flex justify-center pointer-events-none">
+        <Badge 
+          variant="outline" 
+          className="mt-2 bg-background/80 backdrop-blur-sm shadow-sm pointer-events-auto"
+        >
+          variant: {variantId}
+        </Badge>
       </div>
-      <ScrollArea className="flex-1 p-2">
-        <div className="flex flex-col items-center w-full space-y-4">
+      <ScrollArea className="h-full px-2">
+        <div className="flex flex-col items-center w-full space-y-4 pt-12">
           {/* Regular chat messages in a bounded container */}
           <div className="w-full max-w-2xl space-y-4">
             {
@@ -406,8 +409,13 @@ export function Chat({ onVariantChange }: ChatProps) {
             className="min-h-[40px] max-h-[200px] resize-none overflow-hidden"
             rows={1}
           />
-          <Button onClick={sendMessage} disabled={isLoading || isComparingResponses}>
-            Send
+          <Button 
+            onClick={sendMessage} 
+            disabled={isLoading || isComparingResponses}
+            aria-label="Send message"
+            className="h-10 w-10 rounded-full flex items-center justify-center self-end"
+          >
+            <ArrowUp className="h-4 w-4 stroke-3" />
           </Button>
         </div>
       </div>

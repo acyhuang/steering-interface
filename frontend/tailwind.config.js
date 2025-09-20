@@ -15,6 +15,9 @@ export default {
     		}
     	},
     	extend: {
+    		fontFamily: {
+    			mono: ['SF Mono', 'Monoco', 'Consolas', 'monospace']
+    		},
     		borderRadius: {
     			lg: 'var(--radius)',
     			md: 'calc(var(--radius) - 2px)',

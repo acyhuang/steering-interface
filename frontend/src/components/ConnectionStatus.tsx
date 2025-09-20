@@ -30,9 +30,9 @@ export function ConnectionStatus() {
   };
 
   return (
-    <div className="fixed top-4 right-4 flex items-center gap-2">
+    <div className="flex items-center gap-2">
       <div className={`h-2 w-2 rounded-full ${colors[status]}`} />
-      <span className="text-sm text-gray-600">{status}</span>
+      <span className="text-sm text-muted-foreground">{status}</span>
     </div>
   );
 } 
