@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { createLogger } from '@/lib/logger';
 import { featuresApi, chatApi } from '@/lib/api';
 import { ChatMessage } from '@/types/conversation';
+import { ChatStreamChunk } from '@/types/chat';
 import { SteeringLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui';
 
 // Logger for this context
@@ -168,7 +169,7 @@ export function VariantProvider({
   }, []);
 
   /**
-   * Generates a new response using pending feature adjustments
+   * Generates a new response using pending feature adjustments with streaming
    */
   const generateSteeredResponse = useCallback(async (messages: ChatMessage[]) => {
     // Clear any previous errors
@@ -181,20 +182,7 @@ export function VariantProvider({
     }
     
     try {
-      setSteeringState(createLoadingState(SteeringLoadingState.GENERATING_RESPONSE));
-      
-      // Convert pending features to edits array
-      const pendingEdits = Array.from(pendingFeatures.entries()).map(([feature_label, value]) => ({
-        feature_label,
-        value
-      }));
-      
-      logger.debug('Applying pending features for steered response', { 
-        featureCount: pendingFeatures.size,
-        features: pendingEdits
-      });
-      
-      // Apply each pending feature to the backend
+      // Apply each pending feature to the backend first
       for (const [featureLabel, value] of pendingFeatures.entries()) {
         await featuresApi.steerFeature({
           session_id: sessionId,
@@ -204,22 +192,46 @@ export function VariantProvider({
         });
       }
       
-      // Generate a new response with the modified variant
-      const chatResponse = await chatApi.createChatCompletion({
-        messages: messages,
-        variant_id: variantId
-      });
-      
-      // Set the steered response
-      setSteeredResponse(chatResponse.content);
-      
-      // Enable comparison mode after generating steered response
+      // Enable comparison mode immediately and start streaming
       setIsComparingResponses(true);
-      setSteeringState(createLoadingState(SteeringLoadingState.COMPARING));
+      setSteeringState(createLoadingState(SteeringLoadingState.GENERATING_RESPONSE));
+      setSteeredResponse(''); // Start with empty steered response
       
-      logger.debug('Generated steered response', {
-        responseLength: chatResponse.content.length
+      logger.debug('Starting streaming steered response generation', { 
+        featureCount: pendingFeatures.size,
+        features: Array.from(pendingFeatures.entries()).map(([feature_label, value]) => ({
+          feature_label,
+          value
+        }))
       });
+      
+      // Use the same proven streaming approach as Chat.tsx
+      await chatApi.createStreamingChatCompletionWithCallback(
+        {
+          messages: messages,
+          variant_id: variantId,
+          stream: true
+        },
+        // onChunk callback
+        (chunk: ChatStreamChunk) => {
+          if (chunk.type === 'chunk' && chunk.delta) {
+            setSteeredResponse(currentContent => {
+              return (currentContent || '') + chunk.delta;
+            });
+          }
+        },
+        // onComplete callback
+        (response) => {
+          // Ensure final content is set and mark as complete
+          setSteeredResponse(response.content);
+          setSteeringState(createLoadingState(SteeringLoadingState.COMPARING));
+        },
+        // onError callback
+        (error) => {
+          logger.error('Steered response streaming failed', { error });
+          throw error; // Re-throw to be caught by outer try-catch
+        }
+      );
       
     } catch (error) {
       if (error instanceof Error) {
@@ -232,6 +244,7 @@ export function VariantProvider({
         SteeringLoadingState.IDLE,
         error instanceof Error ? error : new Error(String(error))
       ));
+      setIsComparingResponses(false);
     }
   }, [pendingFeatures, variantId, sessionId]);
 

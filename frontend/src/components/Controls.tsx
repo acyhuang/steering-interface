@@ -308,7 +308,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     : "calc(100vh - 280px)"; // Original height
 
   return (
-    <div className="h-full">
+    <div className="h-full bg-muted/50">
       <div className="h-full px-4 py-2 w-full ">
         <div className="flex flex-col h-full gap-2">
           <div className="flex justify-between items-center gap-1">

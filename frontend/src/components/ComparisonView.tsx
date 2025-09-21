@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -62,18 +61,8 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
     steeringState.state === SteeringLoadingState.CONFIRMING || 
     steeringState.state === SteeringLoadingState.CANCELING;
 
-  if (isGenerating) {
-    return (
-      <div className={`flex flex-col gap-2 p-4 ${className}`}>
-        <div className="text-center font-medium text-muted-foreground">
-          Generating steered response...
-        </div>
-        <div className="flex justify-center">
-          <div className="animate-pulse w-8 h-8 rounded-full bg-muted"></div>
-        </div>
-      </div>
-    );
-  }
+  // Show comparison view immediately when generating, with streaming content
+  // const showComparison = originalResponse && (steeredResponse || isGenerating); // Unused variable
 
   if (isProcessing) {
     const actionText = steeringState.state === SteeringLoadingState.CONFIRMING 
@@ -110,17 +99,17 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
 
   return (
     <div className={`flex flex-col gap-4 ${className}`}>
-      <div className="text-center font-medium text-muted-foreground">
+      <div className="text-center text-muted-foreground">
         Which response do you prefer?
       </div>
       
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-2">
         {/* Original Response */}
         <Card 
           className="w-full h-full border-2 hover:border-primary cursor-pointer p-6 hover:bg-accent/50 transition-colors"
           onClick={handleSelectOriginal}
         >
-          <div className="mb-2 text-sm font-medium text-center text-muted-foreground uppercase">Original Response</div>
+          <div className="mb-2 text-xs font-medium font-mono text-center text-muted-foreground uppercase">Original Response</div>
           <div className="prose prose-base max-w-none">
             <ReactMarkdown>
               {originalResponse}
@@ -130,10 +119,12 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
 
         {/* Steered Response */}
         <Card 
-          className="w-full h-full border-2 hover:border-primary cursor-pointer p-6 hover:bg-accent/50 transition-colors"
-          onClick={handleSelectSteered}
+          className={`w-full h-full border-2 cursor-pointer p-6 transition-colors`}
+          onClick={isGenerating ? undefined : handleSelectSteered}
         >
-          <div className="mb-2 text-sm font-medium text-center text-muted-foreground uppercase">Steered Response</div>
+          <div className="mb-2 text-xs font-mono font-medium text-center text-muted-foreground uppercase flex items-center justify-center gap-2">
+            Steered Response
+          </div>
           <div className="prose prose-base max-w-none">
             <ReactMarkdown>
               {steeredResponse}

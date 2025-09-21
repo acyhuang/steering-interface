@@ -1,4 +1,4 @@
-import { ChatRequest, ChatResponse, ChatMessage } from '../types/chat';
+import { ChatRequest, ChatResponse, ChatMessage, ChatStreamChunk, StreamingChatResponse, StreamingState } from '../types/chat';
 import { ComparisonService, PendingFeature } from '../types/comparison';
 import { FeatureActivation, InspectFeaturesRequest, SteerFeatureRequest, SteerFeatureResponse, ClearFeatureRequest, ClearFeatureResponse, SearchFeaturesRequest, ClusteredFeaturesResponse } from '../types/features';
 import { createLogger } from './logger';
@@ -11,35 +11,99 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:800
 export const API_V1_URL = `${API_BASE_URL}/api/v1`;
 
 export const chatApi = {
-  createChatCompletion: async (request: ChatRequest): Promise<ChatResponse> => {
-    logger.debug('Creating chat completion', {
-      messageCount: request.messages.length,
-      variantId: request.variant_id,
-      autoSteer: request.auto_steer
-    });
-    
-    const response = await fetch(`${API_V1_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
-    });
 
-    if (!response.ok) {
-      throw new Error('Failed to create chat completion');
+  // For components that want to handle streaming themselves
+  createStreamingChatCompletionWithCallback: async (
+    request: ChatRequest,
+    onChunk: (chunk: ChatStreamChunk) => void,
+    onComplete: (response: ChatResponse) => void,
+    onError: (error: Error) => void
+  ): Promise<void> => {
+    try {
+      logger.debug('Creating streaming chat completion with callback', {
+        messageCount: request.messages.length,
+        variantId: request.variant_id,
+        autoSteer: request.auto_steer
+      });
+
+      const streamingRequest = { ...request, stream: true };
+      
+      const response = await fetch(`${API_V1_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(streamingRequest),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Streaming request failed: ${response.status} ${response.statusText}`);
+      }
+
+      // Check if we got a streaming response
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('text/plain')) {
+        // Not a streaming response, parse as regular JSON and call onComplete
+        const data = await response.json() as ChatResponse;
+        logger.debug('Got regular response instead of streaming');
+        onComplete(data);
+        return;
+      }
+
+      // Parse streaming response
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
+
+      let fullContent = '';
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const jsonData = line.slice(6); // Remove 'data: ' prefix
+                if (jsonData.trim()) {
+                  const parsedChunk = JSON.parse(jsonData) as ChatStreamChunk;
+                  
+                  if (parsedChunk.type === 'chunk' && parsedChunk.delta) {
+                    fullContent += parsedChunk.delta;
+                    onChunk(parsedChunk);
+                  } else if (parsedChunk.type === 'done') {
+                    // Construct final response
+                    const chatResponse: ChatResponse = {
+                      content: fullContent,
+                      variant_id: parsedChunk.variant_id || request.variant_id,
+                      auto_steered: parsedChunk.auto_steered || false,
+                      auto_steer_result: parsedChunk.auto_steer_result,
+                      variant_json: undefined
+                    };
+                    onComplete(chatResponse);
+                    return;
+                  } else if (parsedChunk.type === 'error') {
+                    throw new Error(parsedChunk.error || 'Streaming error occurred');
+                  }
+                }
+              } catch (parseError) {
+                logger.warn('Failed to parse streaming chunk', { line, error: parseError });
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    } catch (error) {
+      onError(error instanceof Error ? error : new Error(String(error)));
     }
-
-    const data = await response.json() as ChatResponse;
-    
-    logger.debug('Chat completion response', {
-      contentLength: data.content.length,
-      variantId: data.variant_id,
-      autoSteered: data.auto_steered,
-      hasSteerResult: !!data.auto_steer_result
-    });
-    
-    return data;
   },
 
   async checkHealth(): Promise<boolean> {

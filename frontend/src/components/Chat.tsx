@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { ChatMessage } from '@/types/conversation';
+import { ChatStreamChunk } from '@/types/chat';
 import { chatApi, featuresApi } from '@/lib/api';
 import { Textarea } from './ui/textarea';
 import { useVariant } from '@/hooks/useVariant';
@@ -39,6 +40,7 @@ export function Chat({ onVariantChange }: ChatProps) {
   const [loadingState, setLoadingState] = useState<LoadingStateInfo<ChatLoadingState>>(
     createLoadingState(ChatLoadingState.IDLE)
   );
+  const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const wasComparingRef = useRef<boolean>(false);
   const [showSuggestedPrompts, setShowSuggestedPrompts] = useState(true);
@@ -132,7 +134,7 @@ export function Chat({ onVariantChange }: ChatProps) {
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || isStreaming) return;
 
     const userMessage: ChatMessage = {
       role: 'user',
@@ -142,88 +144,143 @@ export function Chat({ onVariantChange }: ChatProps) {
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setLoadingState(createLoadingState(ChatLoadingState.SENDING));
+    setIsStreaming(true);
+
+    // Add a placeholder assistant message for streaming
+    const placeholderAssistantMessage: ChatMessage = {
+      role: 'assistant',
+      content: '',
+    };
+    setMessages((prev) => [...prev, placeholderAssistantMessage]);
 
     try {
-      const response = await chatApi.createChatCompletion({
-        messages: [...messages, userMessage],
-        variant_id: variantId,
-        auto_steer: autoSteerEnabled
-      });
+      // Use streaming API with callback
+      await chatApi.createStreamingChatCompletionWithCallback(
+        {
+          messages: [...messages, userMessage],
+          variant_id: variantId,
+          auto_steer: autoSteerEnabled
+        },
+        // onChunk callback
+        (chunk: ChatStreamChunk) => {
+          if (chunk.type === 'chunk' && chunk.delta) {
+            // Update the last message in real-time by accumulating content
+            setMessages(currentMessages => {
+              const updatedMessages = [...currentMessages];
+              const lastIndex = updatedMessages.length - 1;
+              if (lastIndex >= 0 && updatedMessages[lastIndex].role === 'assistant') {
+                updatedMessages[lastIndex] = {
+                  ...updatedMessages[lastIndex],
+                  content: updatedMessages[lastIndex].content + chunk.delta
+                };
+              }
+              return updatedMessages;
+            });
+          }
+        },
+        // onComplete callback
+        async (response) => {
+          setIsStreaming(false);
 
-      logger.debug('Response from API', { response });
+          // Handle auto-steered responses
+          if (response.auto_steered && response.auto_steer_result) {
+            logger.info('Received auto-steered streaming response', {
+              hasOriginal: !!response.auto_steer_result.original_content,
+              hasSteered: !!response.auto_steer_result.steered_content,
+              featureCount: response.auto_steer_result.applied_features.length
+            });
+            
+            // Store the original response for comparison
+            setOriginalResponseFromChat(response.auto_steer_result.original_content);
+            
+            // Set the steered response in the variant context
+            setSteeredResponse(response.auto_steer_result.steered_content);
+            
+            // Set pending features from auto-steer suggestions
+            const newPendingFeatures = new Map<string, number>();
+            response.auto_steer_result.applied_features.forEach(feature => {
+              newPendingFeatures.set(feature.label, feature.modified_value);
+            });
+            setPendingFeatures(newPendingFeatures);
+            
+            // Create assistant messages for both original and steered responses
+            const originalAssistantMessage: ChatMessage = {
+              role: 'assistant',
+              content: response.auto_steer_result.original_content
+            };
+            
+            // Update message list with original response initially
+            const updatedMessages = [...messages, userMessage, originalAssistantMessage];
+            setMessages(updatedMessages);
+            
+            // Enter comparison mode
+            setIsComparingResponses(true);
+            
+            if (response.variant_id && response.variant_id !== variantId) {
+              setVariantId(response.variant_id);
+              onVariantChange?.(response.variant_id);
+            }
+            
+            await processFeatures(updatedMessages);
+            return;
+          }
 
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: response.content,
-      };
+          // Normal response handling (no auto-steer)
+          const finalAssistantMessage: ChatMessage = {
+            role: 'assistant',
+            content: response.content,
+          };
 
-      // Handle auto-steered responses
-      if (response.auto_steered && response.auto_steer_result) {
-        logger.info('Received auto-steered response', {
-          hasOriginal: !!response.auto_steer_result.original_content,
-          hasSteered: !!response.auto_steer_result.steered_content,
-          featureCount: response.auto_steer_result.applied_features.length
-        });
-        
-        // Store the original response for comparison
-        setOriginalResponseFromChat(response.auto_steer_result.original_content);
-        
-        // Set the steered response in the variant context
-        setSteeredResponse(response.auto_steer_result.steered_content);
-        
-        // Set pending features from auto-steer suggestions
-        const newPendingFeatures = new Map<string, number>();
-        response.auto_steer_result.applied_features.forEach(feature => {
-          newPendingFeatures.set(feature.label, feature.modified_value);
-        });
-        setPendingFeatures(newPendingFeatures);
-        
-        // Create assistant messages for both original and steered responses
-        const originalAssistantMessage: ChatMessage = {
-          role: 'assistant',
-          content: response.auto_steer_result.original_content
-        };
-        
-        const steeredAssistantMessage: ChatMessage = {
-          role: 'assistant',
-          content: response.auto_steer_result.steered_content
-        };
-        
-        // Update message list with original response initially
-        const updatedMessages = [...messages, userMessage, originalAssistantMessage];
-        setMessages(updatedMessages);
-        
-        // Enter comparison mode
-        setIsComparingResponses(true);
-        
-        if (response.variant_id && response.variant_id !== variantId) {
-          setVariantId(response.variant_id);
-          onVariantChange?.(response.variant_id);
+          const updatedMessages = [...messages, userMessage, finalAssistantMessage];
+          setMessages(updatedMessages);
+          
+          if (response.variant_id && response.variant_id !== variantId) {
+            setVariantId(response.variant_id);
+            onVariantChange?.(response.variant_id);
+          }
+          
+          await processFeatures(updatedMessages);
+          setLoadingState(createLoadingState(ChatLoadingState.IDLE));
+        },
+        // onError callback
+        (error) => {
+          logger.error('Streaming failed', { 
+            error: error instanceof Error ? { message: error.message } : { raw: String(error) } 
+          });
+          setIsStreaming(false);
+          
+          // Remove the placeholder message on error
+          setMessages(currentMessages => {
+            const updatedMessages = [...currentMessages];
+            if (updatedMessages.length > 0 && updatedMessages[updatedMessages.length - 1].role === 'assistant' && updatedMessages[updatedMessages.length - 1].content === '') {
+              updatedMessages.pop();
+            }
+            return updatedMessages;
+          });
+          
+          setLoadingState(createLoadingState(ChatLoadingState.IDLE, 
+            error instanceof Error ? error : new Error(String(error))
+          ));
         }
-        
-        await processFeatures(updatedMessages);
-        return;
-      }
-
-      // Normal response handling (no auto-steer)
-      const updatedMessages = [...messages, userMessage, assistantMessage];
-      setMessages(updatedMessages);
-      
-      if (response.variant_id && response.variant_id !== variantId) {
-        setVariantId(response.variant_id);
-        onVariantChange?.(response.variant_id);
-      }
-      
-      await processFeatures(updatedMessages);
+      );
     } catch (error) {
       logger.error('Failed to send message', { 
         error: error instanceof Error ? { message: error.message } : { raw: String(error) } 
       });
+      setIsStreaming(false);
+      
+      // Remove the placeholder message on error
+      setMessages(currentMessages => {
+        const updatedMessages = [...currentMessages];
+        if (updatedMessages.length > 0 && updatedMessages[updatedMessages.length - 1].role === 'assistant' && updatedMessages[updatedMessages.length - 1].content === '') {
+          updatedMessages.pop();
+        }
+        return updatedMessages;
+      });
+      
       setLoadingState(createLoadingState(ChatLoadingState.IDLE, 
         error instanceof Error ? error : new Error(String(error))
       ));
-    } finally {
-      setLoadingState(createLoadingState(ChatLoadingState.IDLE));
     }
   };
 
@@ -330,7 +387,7 @@ export function Chat({ onVariantChange }: ChatProps) {
           variant: {variantId}
         </Badge>
       </div>
-      <ScrollArea className="h-full px-2">
+      <ScrollArea className="h-full px-4">
         <div className="flex flex-col items-center w-full space-y-4 pt-12">
           {/* Regular chat messages in a bounded container */}
           <div className="w-full max-w-2xl space-y-4">
@@ -367,8 +424,8 @@ export function Chat({ onVariantChange }: ChatProps) {
                 </div>
               </div>
             ))}
-            {isLoading && !isComparingResponses && (
-              <div className="text-gray-500">
+            {(isLoading || isStreaming) && !isComparingResponses && (
+              <div className="text-muted-foreground flex items-center gap-2">
                 {getLoadingMessage()}
               </div>
             )}
@@ -405,13 +462,13 @@ export function Chat({ onVariantChange }: ChatProps) {
               }
             }}
             placeholder="Type a message..."
-            disabled={isLoading || isComparingResponses}
+            disabled={isLoading || isComparingResponses || isStreaming}
             className="min-h-[40px] max-h-[200px] resize-none overflow-hidden"
             rows={1}
           />
           <Button 
             onClick={sendMessage} 
-            disabled={isLoading || isComparingResponses}
+            disabled={isLoading || isComparingResponses || isStreaming}
             aria-label="Send message"
             className="h-10 w-10 rounded-full flex items-center justify-center self-end"
           >

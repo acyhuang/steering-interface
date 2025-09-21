@@ -2,21 +2,12 @@ import { useState, useEffect } from "react";
 import { FeatureActivation, SteerFeatureResponse } from "@/types/steering/feature";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { createLogger } from "@/lib/logger";
 import { featuresApi } from "@/lib/api";
 import { useVariant } from "@/hooks/useVariant";
 import { X } from "lucide-react";
 
 const logger = createLogger('FeatureEditor');
-
-// Declare the global window interface for regenerateLastMessage
-declare global {
-  interface Window {
-    regenerateLastMessage: () => Promise<void>;
-  }
-}
 
 // Discrete values for the slider
 const DISCRETE_VALUES = [-0.8, -0.4, 0, 0.4, 0.8];
@@ -123,12 +114,6 @@ export function FeatureEditor({
           onSteer(response);
         }
       }
-
-      // Trigger regeneration to get the steered response
-      if (window.regenerateLastMessage) {
-        logger.debug('Triggering regeneration for comparison');
-        await window.regenerateLastMessage();
-      }
     } catch (error) {
       logger.error('Failed to modify feature:', { 
         error: error instanceof Error ? error.message : String(error)
@@ -145,7 +130,7 @@ export function FeatureEditor({
     : (feature.modifiedActivation !== undefined ? feature.modifiedActivation : 0);
 
   return (
-    <div className="pt-2 mt-1 border-t bg-background">
+    <div className="pt-2 mt-1 border-t bg-inherit">
       <div className="space-y-3 px-2">
         <div className="flex justify-between items-start">
           <div>
