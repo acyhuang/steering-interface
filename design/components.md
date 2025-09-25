@@ -6,8 +6,9 @@ Features marked with [TODO] are planned for future implementation.
 
 ### Chat Interface 
 - Main user interaction point for conversations
-- Handles message input/output 
-- Manages chat history display
+- Handles message input/output with real-time streaming
+- Uses callback pattern for streaming responses (onChunk, onComplete, onError)
+- Manages chat history display with placeholder messages during streaming
 - Provides variant information display
 - Supports message regeneration
 - Integrates with Controls panel through variant and message updates
@@ -48,7 +49,8 @@ Features marked with [TODO] are planned for future implementation.
 ### ComparisonView Component
 - Displays side-by-side comparison of original and steered responses
 - Provides UI for selecting preferred response
-- Shows loading and error states during generation
+- Shows loading and error states during streaming generation
+- Handles real-time updates as steered responses stream in
 - Facilitates the two-step confirmation process for steering
 - Integrated with VariantContext for state management
 

@@ -1,4 +1,4 @@
-# Vercel Deployment
+# Vercel Deployment (abandoned)
 
 ## Overview
 This document outlines the requirements and considerations for deploying the Steering Interface application on Vercel, with a focus on minimizing complexity and ensuring security.

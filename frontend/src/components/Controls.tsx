@@ -260,7 +260,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     return (
       <div className="flex flex-col gap-4 pr-0">
         {isSearching ? (
-          <div className="text-sm text-gray-500">Searching...</div>
+          <div className="text-sm text-muted-foreground">Searching...</div>
         ) : searchResults.length > 0 ? (
           <FeatureTable
             features={searchResults}
@@ -269,11 +269,11 @@ export function Controls({ variantId = "default" }: ControlsProps) {
             onSteer={handleSteer}
           />
         ) : searchQuery ? (
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-muted-foreground">
             Press Enter or click Search to find features
           </div>
         ) : (
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-muted-foreground">
             Use semantic search to find features by their purpose or behavior
           </div>
         )}
@@ -283,7 +283,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
 
   const renderSearchBar = () => {
     return (
-      <div className="flex gap-2 px-1 pt-1 pb-2 sticky top-0 bg-white z-10">
+      <div className="flex gap-2 px-1 pt-1 pb-2 sticky top-0 bg-inherit z-10">
         <Input
           placeholder="Search features..."
           value={searchQuery}
@@ -308,7 +308,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     : "calc(100vh - 280px)"; // Original height
 
   return (
-    <div className="h-full bg-muted/50">
+    <div className="h-full bg-background">
       <div className="h-full px-4 py-2 w-full ">
         <div className="flex flex-col h-full gap-2">
           <div className="flex justify-between items-center gap-1">

@@ -1,10 +1,10 @@
-# Goodfire Ember SDK & API Reference
+# Steering Interface Backend API
 
 Features marked with [TODO] are planned for future implementation.
 
-## Overview of the Steering Interface API
+## Overview
 
-The Steering Interface API provides a secure wrapper around the Goodfire Ember SDK, enabling:
+This document describes our FastAPI backend that provides a secure wrapper around the Goodfire Ember SDK, enabling:
 - Real-time chat interactions with LLMs
 - Feature activation inspection
 - Dynamic feature steering
@@ -81,7 +81,7 @@ variant = Variant("meta-llama/Llama-3.3-70B-Instruct")
 ### Chat
 
 #### Create Chat Completion
-Generates a chat completion using the specified model variant.
+Generates a chat completion using the specified model variant. Supports both streaming (default) and non-streaming modes.
 
 ```http
 POST /chat/completions
@@ -98,23 +98,46 @@ POST /chat/completions
   ],
   "session_id": "string",
   "variant_id": "string",         // optional
+  "stream": true,                  // optional, default: true
+  "auto_steer": false,            // optional, default: false
   "max_completion_tokens": 512,   // optional
   "temperature": 0.7,             // optional
   "top_p": 0.9                    // optional
 }
 ```
 
-**Response:**
+**Streaming Response (default):**
+Server-Sent Events format with `text/plain` content type:
+```
+data: {"type": "chunk", "delta": "Hello", "variant_id": "abc123"}
+data: {"type": "chunk", "delta": " world", "variant_id": "abc123"}
+data: {"type": "done", "variant_id": "abc123", "auto_steered": false}
+```
+
+**Non-streaming Response:**
 ```json
 {
   "content": "string",          // The model's response
   "variant_id": "string",       // ID of the variant used
+  "auto_steered": false,         // Whether auto-steering was applied
+  "auto_steer_result": null,     // Auto-steer details if applicable
   "variant_json": "string"      // Complete variant configuration
 }
 ```
 
+**Frontend API Client:**
+Uses callback pattern for handling streaming responses:
+```typescript
+await chatApi.createStreamingChatCompletionWithCallback(
+  request,
+  (chunk) => { /* Handle each chunk */ },
+  (response) => { /* Handle completion */ },
+  (error) => { /* Handle errors */ }
+);
+```
+
 **SDK Methods Used:** 
-- `client.chat.completions.create()`
+- `client.chat.completions.create()` with `stream=True`
 
 ### Features
 
@@ -353,6 +376,19 @@ POST /features/auto-steer
 - `client.features.search()`
 - `variant.set()`
 
+## Streaming Architecture
+
+**Stream Format:**
+- Uses Server-Sent Events (SSE) with `data:` prefix
+- Each chunk is a JSON object with `type`, `delta`, and metadata
+- Chunks are accumulated on the frontend to build the complete response
+- Supports both regular completions and auto-steer results in streaming mode
+
+**Chunk Types:**
+- `chunk`: Contains incremental content in `delta` field
+- `done`: Signals completion, may include final metadata
+- `error`: Contains error message in `error` field
+
 ## Error Handling
 
 Standard HTTP status codes are used along with error responses:
@@ -361,6 +397,12 @@ Standard HTTP status codes are used along with error responses:
 {
   "detail": "Error description"
 }
+```
+
+**Streaming Errors:**
+Errors during streaming are sent as error chunks:
+```
+data: {"type": "error", "error": "Error description"}
 ```
 
 Common SDK exceptions handled:

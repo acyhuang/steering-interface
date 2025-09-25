@@ -15,8 +15,10 @@ sequenceDiagram
     participant FI as /features/inspect
     
     U->>CI: Send Message
-    CI->>CC: POST Request
-    CC-->>CI: Return Response
+    CI->>CC: POST Request (stream=true)
+    CC-->>CI: SSE Stream (chunks)
+    CI->>CI: Accumulate content
+    CC-->>CI: Stream complete
     CI->>FI: POST Request
     FI-->>CI: Show Feature Activations
 ```
@@ -34,14 +36,15 @@ sequenceDiagram
     
     U->>CO: Toggle AutoSteer ON
     U->>CI: Send Message
-    CI->>CC: POST Request with autoSteer=true
+    CI->>CC: POST Request with autoSteer=true, stream=true
     CC->>AQ: Analyze Query
     AQ->>AQ: Calculate Steering Values
     AQ-->>CC: Return Steering Config
     CC->>CC: Generate Original Response
     CC->>CC: Apply Steering Values
     CC->>CC: Generate Steered Response
-    CC-->>CI: Return Both Responses
+    CC-->>CI: SSE Stream with auto_steer_result
+    CI->>CI: Extract original & steered content
     CI->>CV: Display Comparison View
     CV-->>U: Show Original vs Steered
     
@@ -70,8 +73,9 @@ sequenceDiagram
     CI->>VC: applyPendingFeatures()
     VC->>FS: Apply steering as pending
     FS-->>VC: Update pending state
-    VC->>CC: Generate steered response
-    CC-->>VC: Return steered response
+    VC->>CC: Generate steered response (stream=true)
+    CC-->>VC: SSE Stream (steered chunks)
+    VC->>VC: Accumulate steered content
     VC->>CV: Display comparison view
     CV-->>U: Show original vs steered
     
