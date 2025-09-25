@@ -2,7 +2,7 @@
  * Response types for conversation interactions
  */
 
-import { AutoSteerResult } from './autoSteer';
+import { AutoSteerResult } from '../steering/autoSteer';
 
 export interface ChatResponse {
   content: string;

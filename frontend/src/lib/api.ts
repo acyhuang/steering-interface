@@ -1,6 +1,9 @@
-import { ChatRequest, ChatResponse, ChatMessage, ChatStreamChunk, StreamingChatResponse, StreamingState } from '../types/chat';
-import { ComparisonService, PendingFeature } from '../types/comparison';
-import { FeatureActivation, InspectFeaturesRequest, SteerFeatureRequest, SteerFeatureResponse, ClearFeatureRequest, ClearFeatureResponse, SearchFeaturesRequest, ClusteredFeaturesResponse } from '../types/features';
+import { ChatRequest, ChatResponse, ChatMessage, ChatStreamChunk } from '@/types/conversation';
+import { ComparisonService } from '@/types/variant';
+import { PendingFeature } from '@/types/variant';
+import { FeatureActivation, SteerFeatureResponse } from '@/types/steering/feature';
+import { InspectFeaturesRequest, SteerFeatureRequest, ClearFeatureRequest, ClearFeatureResponse, SearchFeaturesRequest } from '@/types/steering/request';
+import { ClusteredFeaturesResponse } from '@/types/steering/cluster';
 import { createLogger } from './logger';
 
 const logger = createLogger('api');

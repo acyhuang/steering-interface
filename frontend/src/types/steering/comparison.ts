@@ -1,10 +1,15 @@
-import { ChatMessage, ChatResponse, ChatRequest } from './chat';
+/**
+ * Types for comparison workflow in the steering domain
+ */
 
-export interface PendingFeature {
-  featureId: string;
-  featureLabel: string;
-  value: number;
-  status: 'pending' | 'applied' | 'confirmed';
+import { ChatMessage } from '../shared/message';
+import { PendingFeature } from './pending';
+
+export interface ComparisonState {
+  originalResponse: string | null;
+  steeredResponse: string | null;
+  originalState: string | null;
+  steeredState: string | null;
 }
 
 export interface ComparisonService {
@@ -27,4 +32,4 @@ export interface ComparisonService {
   confirmComparison(variantId?: string): Promise<void>;
   
   rejectComparison(variantId?: string): Promise<void>;
-} 
+}

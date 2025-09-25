@@ -2,7 +2,7 @@
  * Request types for steering operations
  */
 
-import { ChatMessage } from '../conversation/message';
+import { ChatMessage } from '../shared/message';
 
 export interface InspectFeaturesRequest {
   messages: ChatMessage[];
@@ -28,4 +28,8 @@ export interface SearchFeaturesRequest {
   session_id: string;
   variant_id?: string;
   top_k?: number;
+}
+
+export interface ClearFeatureResponse {
+  label: string;
 } 

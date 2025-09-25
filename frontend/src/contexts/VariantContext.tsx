@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { createLogger } from '@/lib/logger';
 import { featuresApi, chatApi } from '@/lib/api';
 import { ChatMessage } from '@/types/conversation';
-import { ChatStreamChunk } from '@/types/chat';
+import { ChatStreamChunk } from '@/types/conversation';
 import { SteeringLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui';
 
 // Logger for this context

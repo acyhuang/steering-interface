@@ -12,4 +12,4 @@ export interface PendingFeature {
 export interface PendingState {
   pendingFeatures: Map<string, PendingFeature>;
   lastConfirmedState: string | null;
-} 
+}

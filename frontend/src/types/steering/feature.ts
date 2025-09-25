@@ -1,5 +1,5 @@
 /**
- * Core feature types for the steering domain
+ * Old feature types (remove after migration)
  */
 
 export interface FeatureActivation {

@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { ChatMessage } from '@/types/conversation';
-import { ChatStreamChunk } from '@/types/chat';
+import { ChatStreamChunk } from '@/types/conversation';
 import { chatApi, featuresApi } from '@/lib/api';
 import { Textarea } from './ui/textarea';
 import { useVariant } from '@/hooks/useVariant';
