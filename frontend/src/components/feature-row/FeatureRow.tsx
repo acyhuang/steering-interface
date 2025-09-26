@@ -1,10 +1,10 @@
-import { FeatureActivation } from "@/types/steering/feature"
+import { Feature } from "@/types/domain"
 import { useVariant } from "@/hooks/useVariant";
 
 interface FeatureRowProps {
-  feature: FeatureActivation;
+  feature: Feature;
   isSelected: boolean;
-  onSelect: (feature: FeatureActivation) => void;
+  onSelect: (feature: Feature) => void;
 }
 
 export function FeatureRow({ 
@@ -18,7 +18,7 @@ export function FeatureRow({
   const modificationValue = getFeatureModification(feature.label);
   const displayValue = modificationValue !== null 
     ? modificationValue 
-    : (feature.modifiedActivation !== undefined ? feature.modifiedActivation : 0);
+    : feature.modification;
 
   return (
     <div 

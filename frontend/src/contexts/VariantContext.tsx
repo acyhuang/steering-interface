@@ -1,9 +1,8 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { createLogger } from '@/lib/logger';
 import { featuresApi, chatApi } from '@/lib/api';
-import { ChatMessage } from '@/types/conversation';
-import { ChatStreamChunk } from '@/types/conversation';
-import { SteeringLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui';
+import { ChatMessage } from '@/types/domain';
+import { AppLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui/states';
 
 // Logger for this context
 const logger = createLogger('VariantContext');
@@ -24,7 +23,7 @@ export interface VariantContextType {
   originalResponse: string | null;
   steeredResponse: string | null;
   setSteeredResponse: (content: string | null) => void;
-  steeringState: LoadingStateInfo<SteeringLoadingState>;
+  steeringState: LoadingStateInfo<AppLoadingState>;
   isComparingResponses: boolean;
   setIsComparingResponses: (comparing: boolean) => void;
   generationError: Error | null;
@@ -79,8 +78,8 @@ export function VariantProvider({
   const [currentResponse, setCurrentResponse] = useState<string | null>(null);
   const [steeredResponse, setSteeredResponse] = useState<string | null>(null);
   // Replace boolean flag with a state machine
-  const [steeringState, setSteeringState] = useState<LoadingStateInfo<SteeringLoadingState>>(
-    createLoadingState(SteeringLoadingState.IDLE)
+  const [steeringState, setSteeringState] = useState<LoadingStateInfo<AppLoadingState>>(
+    createLoadingState(AppLoadingState.IDLE)
   );
   const [isComparingResponses, setIsComparingResponses] = useState<boolean>(false);
   const [generationError, setGenerationError] = useState<Error | null>(null);
@@ -94,7 +93,7 @@ export function VariantProvider({
   }, [autoSteerEnabled]);
 
   // Computed properties for backwards compatibility
-  const isGeneratingSteeredResponse = steeringState.state === SteeringLoadingState.GENERATING_RESPONSE;
+  const isGeneratingSteeredResponse = steeringState.state === AppLoadingState.STEERING_GENERATING_RESPONSE;
 
   // Function to refresh variant data from the backend
   const refreshVariant = useCallback(async () => {
@@ -138,7 +137,7 @@ export function VariantProvider({
   const applyPendingFeatures = useCallback(async (featureLabel: string, value: number) => {
     logger.debug('Applying pending feature', { featureLabel, value });
     
-    setSteeringState(createLoadingState(SteeringLoadingState.APPLYING_FEATURES));
+    setSteeringState(createLoadingState(AppLoadingState.STEERING_APPLYING_FEATURES));
     
     try {
       // Update pending features map
@@ -147,11 +146,11 @@ export function VariantProvider({
         newFeatures.set(featureLabel, value);
         return newFeatures;
       });
-      setSteeringState(createLoadingState(SteeringLoadingState.IDLE));
+      setSteeringState(createLoadingState(AppLoadingState.IDLE));
     } catch (error) {
       logger.error('Failed to apply pending feature', { error, featureLabel });
       setSteeringState(createLoadingState(
-        SteeringLoadingState.IDLE,
+        AppLoadingState.IDLE,
         error instanceof Error ? error : new Error(String(error))
       ));
     }
@@ -184,17 +183,24 @@ export function VariantProvider({
     try {
       // Apply each pending feature to the backend first
       for (const [featureLabel, value] of pendingFeatures.entries()) {
-        await featuresApi.steerFeature({
-          session_id: sessionId,
-          variant_id: variantId,
-          feature_label: featureLabel,
-          value: value
-        });
+        // Create a minimal Feature object for the API call
+        const feature = {
+          label: featureLabel,
+          uuid: `temp_${featureLabel}`,
+          indexInSae: 0,
+          activation: 0, // Will be updated by API
+          modification: 0,
+          isModified: false,
+          hasPending: true,
+          pendingModification: value
+        };
+        
+        await featuresApi.steerFeature(feature, sessionId, variantId);
       }
       
       // Enable comparison mode immediately and start streaming
       setIsComparingResponses(true);
-      setSteeringState(createLoadingState(SteeringLoadingState.GENERATING_RESPONSE));
+      setSteeringState(createLoadingState(AppLoadingState.STEERING_GENERATING_RESPONSE));
       setSteeredResponse(''); // Start with empty steered response
       
       logger.debug('Starting streaming steered response generation', { 
@@ -205,26 +211,27 @@ export function VariantProvider({
         }))
       });
       
-      // Use the same proven streaming approach as Chat.tsx
+      // Use the new domain-focused streaming API
       await chatApi.createStreamingChatCompletionWithCallback(
+        messages,
+        variantId,
         {
-          messages: messages,
-          variant_id: variantId,
+          sessionId: sessionId,
           stream: true
         },
         // onChunk callback
-        (chunk: ChatStreamChunk) => {
-          if (chunk.type === 'chunk' && chunk.delta) {
+        (chunk) => {
+          if (chunk.delta) {
             setSteeredResponse(currentContent => {
               return (currentContent || '') + chunk.delta;
             });
           }
         },
         // onComplete callback
-        (response) => {
+        (message, autoSteerResult) => {
           // Ensure final content is set and mark as complete
-          setSteeredResponse(response.content);
-          setSteeringState(createLoadingState(SteeringLoadingState.COMPARING));
+          setSteeredResponse(message.content);
+          setSteeringState(createLoadingState(AppLoadingState.STEERING_COMPARING));
         },
         // onError callback
         (error) => {
@@ -241,7 +248,7 @@ export function VariantProvider({
       }
       logger.error('Failed to generate steered response', { error });
       setSteeringState(createLoadingState(
-        SteeringLoadingState.IDLE,
+        AppLoadingState.IDLE,
         error instanceof Error ? error : new Error(String(error))
       ));
       setIsComparingResponses(false);
@@ -253,7 +260,7 @@ export function VariantProvider({
    */
   const confirmSteeredResponse = useCallback(async (onConfirmed?: () => Promise<void>) => {
     try {
-      setSteeringState(createLoadingState(SteeringLoadingState.CONFIRMING));
+      setSteeringState(createLoadingState(AppLoadingState.STEERING_CONFIRMING));
       
       logger.debug('Confirming steered response', { 
         pendingFeatureCount: pendingFeatures.size 
@@ -295,7 +302,7 @@ export function VariantProvider({
       
       // Always exit comparison mode after confirming, regardless of whether there were pending features
       setIsComparingResponses(false);
-      setSteeringState(createLoadingState(SteeringLoadingState.IDLE));
+      setSteeringState(createLoadingState(AppLoadingState.IDLE));
       
       logger.debug('Steered response confirmed');
       
@@ -309,7 +316,7 @@ export function VariantProvider({
       // Even on error, exit comparison mode to prevent UI from getting stuck
       setIsComparingResponses(false);
       setSteeringState(createLoadingState(
-        SteeringLoadingState.IDLE,
+        AppLoadingState.IDLE,
         error instanceof Error ? error : new Error(String(error))
       ));
     }
@@ -324,15 +331,11 @@ export function VariantProvider({
     });
     
     try {
-      setSteeringState(createLoadingState(SteeringLoadingState.CANCELING));
+      setSteeringState(createLoadingState(AppLoadingState.STEERING_CANCELING));
       
       // Revert the changes in the backend by clearing the features
       for (const [featureLabel] of pendingFeatures.entries()) {
-        await featuresApi.clearFeature({
-          session_id: sessionId,
-          variant_id: variantId,
-          feature_label: featureLabel
-        });
+        await featuresApi.clearFeature(featureLabel, sessionId, variantId);
       }
       
       // Refresh the variant state from backend
@@ -349,7 +352,7 @@ export function VariantProvider({
       
       // Exit comparison mode after canceling
       setIsComparingResponses(false);
-      setSteeringState(createLoadingState(SteeringLoadingState.IDLE));
+      setSteeringState(createLoadingState(AppLoadingState.IDLE));
       
       logger.debug('Steering canceled successfully');
       
@@ -359,7 +362,7 @@ export function VariantProvider({
       // Even on error, exit comparison mode to prevent UI from getting stuck
       setIsComparingResponses(false);
       setSteeringState(createLoadingState(
-        SteeringLoadingState.IDLE,
+        AppLoadingState.IDLE,
         error instanceof Error ? error : new Error(String(error))
       ));
     }

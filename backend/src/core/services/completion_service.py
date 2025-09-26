@@ -6,10 +6,39 @@ from ..config import Settings
 from .interfaces.completion_service import ICompletionService
 from .interfaces.variant_manager import IVariantManager
 from .interfaces.analysis_service import IAnalysisService
-from ...models.chat import ChatMessage, ChatResponse, AutoSteerResult, ChatStreamChunk
+from ...models.chat import ChatMessage, ChatResponse, ChatStreamChunk
+from ...models.features import ComparisonResult, AppliedFeature, SteerFeatureResponse
 from ..logging import with_correlation_id, log_timing
 
 logger = logging.getLogger(__name__)
+
+def _create_comparison_result(
+    original_content: str,
+    steered_content: str,
+    steered_features: List[SteerFeatureResponse]
+) -> ComparisonResult:
+    """Create a ComparisonResult from auto-steering components.
+    
+    This function creates a unified comparison result directly from the auto-steering
+    components without using the legacy AutoSteerResult.
+    """
+    # Convert SteerFeatureResponse to AppliedFeature
+    # Note: We need to ensure compatibility with frontend ApiFeature structure
+    applied_features = []
+    for feature in steered_features:
+        applied_features.append(AppliedFeature(
+            label=feature.label,
+            activation=feature.activation,  # Base activation value
+            modified_value=feature.modified_value,  # Applied steering value
+            category="auto_steer"  # Default category for auto-steered features
+        ))
+    
+    return ComparisonResult(
+        original_content=original_content,
+        steered_content=steered_content,
+        applied_features=applied_features,
+        source="automatic"  # Auto-steering is always automatic
+    )
 
 class CompletionService(ICompletionService):
     """Service for generating chat completions.
@@ -107,7 +136,7 @@ class CompletionService(ICompletionService):
             original_content = response.choices[0].message["content"] if response.choices else ""
             
             # When auto-steer is enabled, generate a steered response
-            auto_steer_result = None
+            comparison_result = None
             if auto_steer and messages and messages[-1].role == "user":
                 try:
                     logger.info("Auto-steer enabled, generating steered response", extra={
@@ -145,7 +174,7 @@ class CompletionService(ICompletionService):
                     # Don't continue if no features were suggested
                     if not steered_features:
                         logger.info("No auto-steered features found, skipping steered response")
-                        auto_steer_result = None
+                        comparison_result = None
                     else:
                         # Generate steered response with the suggested features
                         steered_response = await self.client.chat.completions.create(
@@ -159,11 +188,11 @@ class CompletionService(ICompletionService):
                         
                         steered_content = steered_response.choices[0].message["content"] if steered_response.choices else ""
                         
-                        # Create the auto-steer result
-                        auto_steer_result = AutoSteerResult(
+                        # Create the unified comparison result directly
+                        comparison_result = _create_comparison_result(
                             original_content=original_content,
                             steered_content=steered_content,
-                            applied_features=steered_features
+                            steered_features=steered_features
                         )
                         
                         logger.info("Successfully generated auto-steered response", extra={
@@ -179,7 +208,7 @@ class CompletionService(ICompletionService):
                         "error": str(e)
                     })
                     # Continue with just the original response if auto-steer fails
-                    auto_steer_result = None
+                    comparison_result = None
             
             # Decide on the content to return
             final_content = original_content
@@ -189,14 +218,14 @@ class CompletionService(ICompletionService):
                 "variant_id": variant_id,
                 "content_length": len(final_content),
                 "auto_steer": auto_steer,
-                "has_steered_response": auto_steer_result is not None
+                "has_steered_response": comparison_result is not None
             })
             
             return ChatResponse(
                 content=final_content,
                 variant_id=variant_id or "default",
-                auto_steered=auto_steer and auto_steer_result is not None,
-                auto_steer_result=auto_steer_result,
+                auto_steered=auto_steer and comparison_result is not None,
+                comparison_result=comparison_result,  # Unified comparison result
                 variant_json=variant.json()
             )
             
@@ -429,19 +458,19 @@ class CompletionService(ICompletionService):
                     variant_id=variant_id or "default"
                 )
             
-            # Create auto-steer result
-            auto_steer_result = AutoSteerResult(
+            # Create the unified comparison result directly
+            comparison_result = _create_comparison_result(
                 original_content=original_content,
                 steered_content=steered_content,
-                applied_features=steered_features
+                steered_features=steered_features
             )
             
-            # Send completion with auto-steer result
+            # Send completion with unified comparison result
             yield ChatStreamChunk(
                 type="done",
                 variant_id=variant_id or "default",
                 auto_steered=True,
-                auto_steer_result=auto_steer_result
+                comparison_result=comparison_result  # Unified comparison result
             )
             
             logger.info("Successfully streamed auto-steered response", extra={

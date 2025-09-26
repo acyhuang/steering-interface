@@ -1,15 +1,14 @@
 import { useState, useEffect } from "react";
-import { FeatureActivation, SteerFeatureResponse } from "@/types/steering/feature";
-import { FeatureCluster } from "@/types/steering/cluster";
+import { Feature, FeatureCluster } from "@/types/domain";
 import { FeatureRow } from "./FeatureRow";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface FeatureTableProps {
-  features: FeatureActivation[];
+  features: Feature[];
   clusters?: FeatureCluster[];
-  selectedFeature: FeatureActivation | null;
-  onSelectFeature: (feature: FeatureActivation) => void;
-  onSteer?: (response: SteerFeatureResponse) => void;
+  selectedFeature: Feature | null;
+  onSelectFeature: (feature: Feature) => void;
+  onSteer?: (steeredFeature: Feature) => void;
 }
 
 export function FeatureTable({

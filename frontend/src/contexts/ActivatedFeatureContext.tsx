@@ -1,18 +1,17 @@
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
-import { FeatureActivation } from '@/types/steering/feature';
-import { FeatureCluster } from '@/types/steering/cluster';
+import { Feature, FeatureCluster } from '@/types/domain';
 import { featuresApi } from '@/lib/api';
 import { createLogger } from '@/lib/logger';
 import { useVariant } from '@/hooks/useVariant';
 
 interface ActivatedFeatureContextType {
   // State
-  activeFeatures: FeatureActivation[];
+  activeFeatures: Feature[];
   featureClusters: FeatureCluster[];
   isLoading: boolean;
   
   // Core functions
-  setActiveFeatures: (features: FeatureActivation[]) => void;
+  setActiveFeatures: (features: Feature[]) => void;
   setFeatureClusters: (clusters: FeatureCluster[]) => void;
   clearFeatures: () => void;
   refreshClusters: (forceRefresh?: boolean) => Promise<void>;
@@ -25,13 +24,13 @@ export interface ActivatedFeatureProviderProps {
   children: ReactNode;
 }
 
-// Helper function to check if two arrays of features have the same modified activation values
-function haveModificationsChanged(prevFeatures: FeatureActivation[], nextFeatures: FeatureActivation[]): boolean {
+// Helper function to check if two arrays of features have the same modifications
+function haveModificationsChanged(prevFeatures: Feature[], nextFeatures: Feature[]): boolean {
   if (prevFeatures.length !== nextFeatures.length) return true;
   
   for (let i = 0; i < prevFeatures.length; i++) {
     if (prevFeatures[i].label !== nextFeatures[i].label ||
-        prevFeatures[i].modifiedActivation !== nextFeatures[i].modifiedActivation) {
+        prevFeatures[i].modification !== nextFeatures[i].modification) {
       return true;
     }
   }
@@ -42,25 +41,21 @@ function haveModificationsChanged(prevFeatures: FeatureActivation[], nextFeature
 export function ActivatedFeatureProvider({ children }: ActivatedFeatureProviderProps) {
   const logger = createLogger('ActivatedFeatureContext');
   const { variantId, variantJson } = useVariant();
-  const [activeFeatures, setActiveFeaturesState] = useState<FeatureActivation[]>([]);
+  const [activeFeatures, setActiveFeaturesState] = useState<Feature[]>([]);
   const [featureClusters, setFeatureClustersState] = useState<FeatureCluster[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const previousVariantJson = useRef<any>(null);
 
-  // Set active features with modifiedActivation initialized to 0
-  const setActiveFeatures = useCallback((features: FeatureActivation[]) => {
+  // Set active features with modifications initialized to 0
+  const setActiveFeatures = useCallback((features: Feature[]) => {
     logger.debug('Setting active features', { count: features.length });
     
-    // Initialize with modifiedActivation = 0, but check for existing modifications in variant
-    const featuresWithModified = features.map(feature => ({
-      ...feature,
-      modifiedActivation: 0 // Default to 0, will be updated from variant if available
-    }));
-    
-    setActiveFeaturesState(featuresWithModified);
+    // Features from the new API already have proper modification state
+    // No need to transform - they're already domain objects
+    setActiveFeaturesState(features);
   }, [logger]);
 
-  // Update modifiedActivation values when variantJson changes
+  // Update feature modifications when variantJson changes
   useEffect(() => {
     // Skip if no features or variant hasn't changed
     if (!activeFeatures.length || 
@@ -73,7 +68,7 @@ export function ActivatedFeatureProvider({ children }: ActivatedFeatureProviderP
     previousVariantJson.current = variantJson;
     
     if (Array.isArray(variantJson.edits)) {
-      logger.debug('Updating modified activations from variant data', {
+      logger.debug('Updating feature modifications from variant data', {
         editCount: variantJson.edits.length,
         featureCount: activeFeatures.length
       });
@@ -90,9 +85,11 @@ export function ActivatedFeatureProvider({ children }: ActivatedFeatureProviderP
       // Update activeFeatures with modified values from the variant
       const updatedFeatures = activeFeatures.map(feature => {
         const modifiedValue = modifiedValuesMap.get(feature.label);
+        const newModification = modifiedValue !== undefined ? modifiedValue : 0;
         return {
           ...feature,
-          modifiedActivation: modifiedValue !== undefined ? modifiedValue : 0
+          modification: newModification,
+          isModified: newModification !== 0
         };
       });
       
@@ -130,18 +127,16 @@ export function ActivatedFeatureProvider({ children }: ActivatedFeatureProviderP
         forceRefresh 
       });
       
-      const response = await featuresApi.clusterFeatures(
+      const clusters = await featuresApi.clusterFeatures(
         activeFeatures,
         "default_session",
         variantId // Use the current variant ID from context
       );
       
-      if (response?.clusters) {
-        setFeatureClustersState(response.clusters);
-        logger.debug('Feature clusters refreshed', { 
-          clusterCount: response.clusters.length 
-        });
-      }
+      setFeatureClustersState(clusters);
+      logger.debug('Feature clusters refreshed', { 
+        clusterCount: clusters.length 
+      });
     } catch (error) {
       logger.error('Failed to refresh clusters', { 
         error: error instanceof Error ? error.message : String(error) 

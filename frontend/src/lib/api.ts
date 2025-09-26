@@ -1,9 +1,40 @@
-import { ChatRequest, ChatResponse, ChatMessage, ChatStreamChunk } from '@/types/conversation';
-import { ComparisonService } from '@/types/variant';
-import { PendingFeature } from '@/types/variant';
-import { FeatureActivation, SteerFeatureResponse } from '@/types/steering/feature';
-import { InspectFeaturesRequest, SteerFeatureRequest, ClearFeatureRequest, ClearFeatureResponse, SearchFeaturesRequest } from '@/types/steering/request';
-import { ClusteredFeaturesResponse } from '@/types/steering/cluster';
+// Domain types (React-First)
+import { 
+  Feature, 
+  ChatMessage, 
+  ComparisonResult,
+  FeatureCluster,
+  FeatureSearchResult,
+  createChatMessage
+} from '@/types/domain';
+
+// Note: Legacy ComparisonService removed - functionality now in VariantContext
+
+// API transformation functions
+import {
+  chatToApiRequest,
+  inspectFeaturesToApiRequest,
+  steerFeatureToApiRequest,
+  clearFeatureToApiRequest,
+  searchFeaturesToApiRequest,
+  apiFeatureToFeature,
+  apiChatResponseToComparisonResult,
+  apiStreamChunkToComparisonResult,
+  apiClusteredResponseToFeatureClusters,
+  apiFeatureActivationsToSearchResult,
+  createChatMessageFromApiResponse
+} from '@/types/api/transforms';
+
+// API types (internal to API layer) - ApiChatRequest is used in transforms, not directly here
+
+import type {
+  ApiChatResponse,
+  ApiChatStreamChunk,
+  ApiFeature,
+  ApiClearFeatureResponse,
+  ApiClusteredFeaturesResponse
+} from '@/types/api/responses';
+
 import { createLogger } from './logger';
 
 const logger = createLogger('api');
@@ -17,26 +48,39 @@ export const chatApi = {
 
   // For components that want to handle streaming themselves
   createStreamingChatCompletionWithCallback: async (
-    request: ChatRequest,
-    onChunk: (chunk: ChatStreamChunk) => void,
-    onComplete: (response: ChatResponse) => void,
+    messages: ChatMessage[],
+    variantId: string,
+    options: {
+      sessionId?: string;
+      autoSteer?: boolean;
+      stream?: boolean;
+      maxTokens?: number;
+      temperature?: number;
+      topP?: number;
+    } = {},
+    onChunk: (chunk: { delta: string; comparisonResult?: ComparisonResult }) => void,
+    onComplete: (message: ChatMessage, comparisonResult?: ComparisonResult) => void,
     onError: (error: Error) => void
   ): Promise<void> => {
     try {
       logger.debug('Creating streaming chat completion with callback', {
-        messageCount: request.messages.length,
-        variantId: request.variant_id,
-        autoSteer: request.auto_steer
+        messageCount: messages.length,
+        variantId,
+        autoSteer: options.autoSteer
       });
 
-      const streamingRequest = { ...request, stream: true };
+      // Transform domain types to API request
+      const apiRequest = chatToApiRequest(messages, variantId, {
+        ...options,
+        stream: true
+      });
       
       const response = await fetch(`${API_V1_URL}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(streamingRequest),
+        body: JSON.stringify(apiRequest),
       });
 
       if (!response.ok) {
@@ -47,9 +91,12 @@ export const chatApi = {
       const contentType = response.headers.get('content-type');
       if (!contentType?.includes('text/plain')) {
         // Not a streaming response, parse as regular JSON and call onComplete
-        const data = await response.json() as ChatResponse;
+        const apiResponse = await response.json() as ApiChatResponse;
         logger.debug('Got regular response instead of streaming');
-        onComplete(data);
+        
+        const chatMessage = createChatMessageFromApiResponse(apiResponse);
+        const comparisonResult = apiChatResponseToComparisonResult(apiResponse);
+        onComplete(chatMessage, comparisonResult || undefined);
         return;
       }
 
@@ -75,24 +122,23 @@ export const chatApi = {
               try {
                 const jsonData = line.slice(6); // Remove 'data: ' prefix
                 if (jsonData.trim()) {
-                  const parsedChunk = JSON.parse(jsonData) as ChatStreamChunk;
+                  const apiChunk = JSON.parse(jsonData) as ApiChatStreamChunk;
                   
-                  if (parsedChunk.type === 'chunk' && parsedChunk.delta) {
-                    fullContent += parsedChunk.delta;
-                    onChunk(parsedChunk);
-                  } else if (parsedChunk.type === 'done') {
-                    // Construct final response
-                    const chatResponse: ChatResponse = {
-                      content: fullContent,
-                      variant_id: parsedChunk.variant_id || request.variant_id,
-                      auto_steered: parsedChunk.auto_steered || false,
-                      auto_steer_result: parsedChunk.auto_steer_result,
-                      variant_json: undefined
-                    };
-                    onComplete(chatResponse);
+                  if (apiChunk.type === 'chunk' && apiChunk.delta) {
+                    fullContent += apiChunk.delta;
+                    const comparisonResult = apiStreamChunkToComparisonResult(apiChunk);
+                    onChunk({ 
+                      delta: apiChunk.delta, 
+                      comparisonResult: comparisonResult || undefined 
+                    });
+                  } else if (apiChunk.type === 'done') {
+                    // Create final chat message from accumulated content
+                    const chatMessage = createChatMessage('assistant', fullContent);
+                    const comparisonResult = apiStreamChunkToComparisonResult(apiChunk);
+                    onComplete(chatMessage, comparisonResult || undefined);
                     return;
-                  } else if (parsedChunk.type === 'error') {
-                    throw new Error(parsedChunk.error || 'Streaming error occurred');
+                  } else if (apiChunk.type === 'error') {
+                    throw new Error(apiChunk.error || 'Streaming error occurred');
                   }
                 }
               } catch (parseError) {
@@ -131,38 +177,52 @@ interface CreateVariantResponse {
 }
 
 export const featuresApi = {
-  inspectFeatures: async (request: InspectFeaturesRequest): Promise<FeatureActivation[]> => {
+  inspectFeatures: async (
+    messages: ChatMessage[],
+    sessionId: string,
+    variantId?: string
+  ): Promise<Feature[]> => {
+    const apiRequest = inspectFeaturesToApiRequest(messages, sessionId, variantId);
+    
     const response = await fetch(`${API_V1_URL}/features/inspect`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify(apiRequest),
     });
 
     if (!response.ok) {
       throw new Error('Failed to inspect features');
     }
 
-    const data = await response.json() as FeatureActivation[];
-    return data;
+    const apiFeatures = await response.json() as ApiFeature[];
+    return apiFeatures.map((f, index) => 
+      apiFeatureToFeature(f, `${f.label}_${index}`, index)
+    );
   },
 
-  steerFeature: async (request: SteerFeatureRequest): Promise<SteerFeatureResponse> => {
+  steerFeature: async (
+    feature: Feature,
+    sessionId: string,
+    variantId?: string
+  ): Promise<Feature> => {
+    const apiRequest = steerFeatureToApiRequest(feature, sessionId, variantId);
+    
     const response = await fetch(`${API_V1_URL}/features/steer`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify(apiRequest),
     });
 
     if (!response.ok) {
       throw new Error('Failed to steer feature');
     }
 
-    const data = await response.json() as SteerFeatureResponse;
-    return data;
+    const apiResponse = await response.json() as ApiFeature;
+    return apiFeatureToFeature(apiResponse, feature.uuid, feature.indexInSae);
   },
 
   getModifiedFeatures: async (sessionId: string, variantId?: string): Promise<Record<string, unknown>> => {
@@ -183,54 +243,74 @@ export const featuresApi = {
     }
   },
 
-  clearFeature: async (request: ClearFeatureRequest): Promise<ClearFeatureResponse> => {
+  clearFeature: async (
+    featureLabel: string,
+    sessionId: string,
+    variantId?: string
+  ): Promise<void> => {
+    const apiRequest = clearFeatureToApiRequest(featureLabel, sessionId, variantId);
+    
     const response = await fetch(`${API_V1_URL}/features/clear`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify(apiRequest),
     });
 
     if (!response.ok) {
       throw new Error('Failed to clear feature');
     }
 
-    const data = await response.json() as ClearFeatureResponse;
-    return data;
+    // Clear operation doesn't need to return data in domain layer
+    await response.json() as ApiClearFeatureResponse;
   },
 
-  searchFeatures: async (request: SearchFeaturesRequest): Promise<FeatureActivation[]> => {
+  searchFeatures: async (
+    query: string,
+    sessionId: string,
+    variantId?: string,
+    maxResults?: number
+  ): Promise<FeatureSearchResult> => {
+    const apiRequest = searchFeaturesToApiRequest(query, sessionId, variantId, maxResults);
+    
     const response = await fetch(`${API_V1_URL}/features/search`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify(apiRequest),
     });
 
     if (!response.ok) {
       throw new Error('Failed to search features');
     }
 
-    const data = await response.json() as FeatureActivation[];
-    return data;
+    const apiFeatures = await response.json() as ApiFeature[];
+    return apiFeatureActivationsToSearchResult(apiFeatures, query);
   },
 
   clusterFeatures: async (
-    features: FeatureActivation[],
+    features: Feature[],
     sessionId: string,
     variantId?: string,
     forceRefresh: boolean = false
-  ): Promise<ClusteredFeaturesResponse> => {
+  ): Promise<FeatureCluster[]> => {
     const effectiveVariantId = variantId || sessionId;
+    
+    // Convert domain Features to API format for clustering request
+    const apiFeatures: ApiFeature[] = features.map(f => ({
+      label: f.label,
+      activation: f.activation
+    }));
+    
     const response = await fetch(`${API_V1_URL}/features/cluster`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        features,
+        features: apiFeatures,
         session_id: sessionId,
         variant_id: effectiveVariantId,
         force_refresh: forceRefresh
@@ -241,8 +321,8 @@ export const featuresApi = {
       throw new Error('Failed to cluster features');
     }
 
-    const data = await response.json() as ClusteredFeaturesResponse;
-    return data;
+    const apiResponse = await response.json() as ApiClusteredFeaturesResponse;
+    return apiClusteredResponseToFeatureClusters(apiResponse);
   },
 
   createVariant: async (
@@ -269,413 +349,6 @@ export const featuresApi = {
   },
 };
 
-/**
- * Implementation of ComparisonService for handling comparison operations
- */
-export class ComparisonServiceImpl implements ComparisonService {
-  private apiBase: string;
-  private logger: ReturnType<typeof createLogger>;
-
-  constructor(apiBase: string = API_V1_URL) {
-    this.apiBase = apiBase;
-    this.logger = createLogger('ComparisonService');
-    this.logger.info('ComparisonService initialized', { apiBase });
-  }
-
-  /**
-   * Generate comparison responses for original and steered variants
-   */
-  async generateComparison(
-    messages: ChatMessage[],
-    pendingFeatures: PendingFeature[],
-    variantId?: string
-  ): Promise<{
-    original: string;
-    steered: string;
-    originalState: string;
-    steeredState: string;
-  }> {
-    try {
-      this.logger.debug('Generate comparison started', {
-        messageCount: messages.length,
-        messages: messages,
-        pendingFeatures: pendingFeatures,
-        variantId: variantId || 'none'
-      });
-      
-      this.logger.info('Generating comparison', { 
-        messageCount: messages.length,
-        pendingFeatureCount: pendingFeatures.length,
-        variantId
-      });
-      
-      // Enhanced logging for pending features
-      if (pendingFeatures.length > 0) {
-        this.logger.info('Pending features details', {
-          features: pendingFeatures.map(f => ({
-            id: f.featureId,
-            value: f.value,
-            status: f.status
-          }))
-        });
-      } else {
-        this.logger.warn('No pending features provided to ComparisonService');
-      }
-      
-      // Extract the last assistant message as the original response
-      const lastAssistantMsg = [...messages].reverse().find(msg => msg.role === 'assistant');
-      let originalResponse: string;
-      let originalState: string = '{}';
-      
-      if (lastAssistantMsg) {
-        this.logger.info('Using last assistant message as original response', {
-          contentLength: lastAssistantMsg.content.length,
-          contentPreview: lastAssistantMsg.content.substring(0, 50) + '...'
-        });
-        originalResponse = lastAssistantMsg.content;
-        
-        // Get current variant state
-        try {
-          const variantState = await featuresApi.getModifiedFeatures(
-            'default_session', // Use a consistent session ID
-            variantId || undefined
-          ) as Record<string, unknown>;
-          originalState = JSON.stringify(variantState);
-        } catch (error) {
-          this.logger.error('Failed to get variant state for original response', {
-            error: this.formatError(error)
-          });
-        }
-      } else {
-        this.logger.warn('No existing assistant message found, generating new original response');
-        // Generate original response if no existing message
-        const originalReq: ChatRequest = {
-          messages,
-          variant_id: variantId || 'default'
-        };
-        const originalRes = await this.callChatCompletions(originalReq);
-        originalResponse = originalRes.content;
-        originalState = originalRes.variant_json || '{}';
-      }
-
-      // Initialize with all messages
-      let messagesForSteeredResponse = [...messages];
-      
-      // Log original messages for debugging
-      this.logger.debug('Original messages before filtering', {
-        messageCount: messages.length,
-        roles: messages.map(m => m.role),
-        lastAssistantMsgFound: !!lastAssistantMsg
-      });
-      
-      if (lastAssistantMsg) {
-        // Find the index of the last assistant message
-        const lastAssistantIndex = messages.findIndex(
-          msg => msg.role === 'assistant' && 
-          msg.content === lastAssistantMsg.content
-        );
-        
-        if (lastAssistantIndex !== -1) {
-          // Keep all messages up to but excluding the last assistant message
-          messagesForSteeredResponse = [
-            ...messages.slice(0, lastAssistantIndex)
-          ];
-        }
-      }
-      
-      this.logger.debug('Preparing messages for steered response', {
-        originalCount: messages.length,
-        filteredCount: messagesForSteeredResponse.length,
-        filteredRoles: messagesForSteeredResponse.map(m => m.role),
-        removedAssistantMessage: lastAssistantMsg ? true : false
-      });
-
-      // Apply the pending features first before generating the steered response
-      if (pendingFeatures && pendingFeatures.length > 0) {
-        this.logger.info('Applying pending features before generating steered response', {
-          featureCount: pendingFeatures.length
-        });
-        
-        // Apply each feature using the steerFeature endpoint
-        const applyPromises = pendingFeatures.map(async (feature) => {
-          const url = `${this.apiBase}/features/steer`;
-          this.logger.debug('Applying feature for steered response', { 
-            feature_label: feature.featureLabel,
-            value: feature.value
-          });
-          
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              session_id: 'default_session', // Use a consistent session ID
-              variant_id: variantId,
-              feature_label: feature.featureLabel,
-              value: feature.value
-            })
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to apply feature ${feature.featureLabel} for steered response: ${response.status} ${response.statusText} - ${errorText}`);
-          }
-          
-          return await response.json();
-        });
-        
-        // Wait for all features to be applied
-        await Promise.all(applyPromises);
-        this.logger.info('All pending features applied for steered response');
-      }
-
-      // Generate steered response with the features now applied to the variant
-      const steeredReq: ChatRequest = {
-        messages: messagesForSteeredResponse,
-        variant_id: variantId || 'default'
-      };
-      
-      this.logger.debug('Steered request about to be sent', {
-        filteredMessagesCount: messagesForSteeredResponse.length,
-        filteredMessages: messagesForSteeredResponse,
-        variantId: variantId || 'none'
-      });
-      
-      const steeredRes = await this.callChatCompletions(steeredReq);
-      
-      this.logger.debug('Comparison results', {
-        originalResponse: originalResponse,
-        steeredResponse: steeredRes.content,
-        responsesIdentical: originalResponse === steeredRes.content
-      });
-      
-      this.logger.info('Comparison generated successfully', {
-        originalLength: originalResponse.length,
-        originalPreview: originalResponse.substring(0, 50) + '...',
-        steeredLength: steeredRes.content.length,
-        steeredPreview: steeredRes.content.substring(0, 50) + '...'
-      });
-
-      return {
-        original: originalResponse,
-        steered: steeredRes.content,
-        originalState: originalState,
-        steeredState: steeredRes.variant_json || '{}'
-      };
-    } catch (error) {
-      this.logger.error('Failed to generate comparison', { error: this.formatError(error) });
-      throw new Error(error instanceof Error ? error.message : 'Failed to generate comparison');
-    }
-  }
-
-  /**
-   * Apply pending features to a variant
-   */
-  async applyPendingFeatures(
-    features: PendingFeature[],
-    variantId?: string
-  ): Promise<void> {
-    if (features.length === 0) {
-      this.logger.info('No pending features to apply');
-      return;
-    }
-
-    try {
-      this.logger.info('Applying pending features', { 
-        featureCount: features.length,
-        variantId
-      });
-
-      // Process each feature individually using the steerFeature endpoint
-      // which expects session_id, variant_id, feature_label, and value
-      const promises = features.map(async (feature) => {
-        const url = `${this.apiBase}/features/steer`;
-        this.logger.debug('Applying feature', { 
-          feature_label: feature.featureLabel,
-          value: feature.value
-        });
-        
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            session_id: 'default_session', // Use a consistent session ID
-            variant_id: variantId,
-            feature_label: feature.featureLabel,
-            value: feature.value
-          })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to apply feature ${feature.featureLabel}: ${response.status} ${response.statusText} - ${errorText}`);
-        }
-        
-        return await response.json();
-      });
-
-      // Wait for all feature applications to complete
-      await Promise.all(promises);
-      this.logger.info('Pending features applied successfully');
-    } catch (error) {
-      this.logger.error('Error applying pending features', { error: this.formatError(error) });
-      throw new Error(error instanceof Error ? error.message : 'Failed to apply pending features');
-    }
-  }
-
-  /**
-   * Confirm a comparison (accept steered response)
-   */
-  async confirmComparison(variantId?: string): Promise<void> {
-    try {
-      this.logger.info('Confirming comparison', { variantId });
-
-      // Use the /features/modified endpoint to save the current state since we don't have a direct confirm endpoint
-      const url = `${this.apiBase}/features/modified`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          variant_id: variantId,
-          action: 'confirm'
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to confirm comparison: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      this.logger.info('Comparison confirmed successfully');
-    } catch (error) {
-      this.logger.error('Error confirming comparison', { error: this.formatError(error) });
-      throw new Error(error instanceof Error ? error.message : 'Failed to confirm comparison');
-    }
-  }
-
-  /**
-   * Reject a comparison (revert to original response)
-   */
-  async rejectComparison(variantId?: string): Promise<void> {
-    try {
-      this.logger.info('Rejecting comparison', { variantId });
-
-      // Use the /features/clear endpoint to revert since we don't have a direct revert endpoint
-      const url = `${this.apiBase}/features/clear`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          variant_id: variantId,
-          all_features: true
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to reject comparison: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      this.logger.info('Comparison rejected successfully');
-    } catch (error) {
-      this.logger.error('Error rejecting comparison', { error: this.formatError(error) });
-      throw new Error(error instanceof Error ? error.message : 'Failed to reject comparison');
-    }
-  }
-
-  /**
-   * Helper method to call chat completions API
-   */
-  private async callChatCompletions(request: ChatRequest): Promise<ChatResponse> {
-    try {
-      // Enhance logging with more details about the request
-      this.logger.info('Calling chat completions API', { 
-        messageCount: request.messages.length,
-        variant_id: request.variant_id || 'none',
-        hasLastAssistantMessage: request.messages.some((m: ChatMessage) => m.role === 'assistant'),
-        lastMessageRole: request.messages.length > 0 ? request.messages[request.messages.length - 1].role : 'none',
-        messageRoles: request.messages.map((m: ChatMessage) => m.role)
-      });
-      
-      // Check if we have the last message as user to help debug
-      if (request.messages.length > 0 && request.messages[request.messages.length - 1].role !== 'user') {
-        this.logger.warn('Last message is not from user - this may cause unexpected behavior', {
-          lastRole: request.messages[request.messages.length - 1].role
-        });
-      }
-      
-      // Log the current variant state to verify the steering is applied
-      let activeFeatures: any[] = [];
-      try {
-        const variantState = await featuresApi.getModifiedFeatures(
-          'default_session',
-          request.variant_id || undefined
-        );
-        
-        activeFeatures = Array.isArray(variantState.edits) ? variantState.edits : [];
-        
-        this.logger.debug('Variant state before chat completion', {
-          variantId: request.variant_id || 'none',
-          activeFeatures: activeFeatures,
-          fullVariantState: variantState
-        });
-      } catch (error) {
-        this.logger.error('Failed to fetch variant state before generating response', {
-          error: this.formatError(error)
-        });
-      }
-      
-      this.logger.debug('Chat completion request', {
-        requestBody: request
-      });
-      
-      const response = await fetch(`${this.apiBase}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to generate chat completion: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      const data = await response.json() as ChatResponse;
-      
-      // Add Chat component style logging for consistency
-      this.logger.info('Response from API:', { 
-        content: data.content.substring(0, 50),
-        variant_id: data.variant_id,
-        has_variant_json: !!data.variant_json
-      });
-      
-      return data;
-    } catch (error) {
-      this.logger.error('Error in chat completions', { error: this.formatError(error) });
-      throw new Error(error instanceof Error ? error.message : 'Failed to generate chat completion');
-    }
-  }
-
-  /**
-   * Format error object for logger
-   */
-  private formatError(error: unknown): Record<string, unknown> {
-    if (error instanceof Error) {
-      return {
-        message: error.message,
-        name: error.name,
-        stack: error.stack
-      };
-    }
-    return { rawError: String(error) };
-  }
-} 
+// Legacy ComparisonServiceImpl removed - functionality now handled by VariantContext
+// All comparison operations (generateSteeredResponse, confirmSteeredResponse, cancelSteering)
+// are available through the VariantContext hook. 

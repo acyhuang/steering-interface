@@ -8,13 +8,13 @@ import { Switch } from "./ui/switch"
 import {
 
 } from "./ui/dialog"
-import { FeatureActivation, SteerFeatureResponse } from "@/types/steering/feature"
+import { Feature } from "@/types/domain"
 import { featuresApi } from "@/lib/api"
 import { useLogger } from '@/lib/logger'
 import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext'
 import { useVariant } from '@/hooks/useVariant'
 import { FeatureTable, FeatureEditor } from './feature-row'
-import { ControlsLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui'
+import { AppLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui'
 import { HelpCircle } from "lucide-react"
 import {
   Dialog,
@@ -46,35 +46,39 @@ export function Controls({ variantId = "default" }: ControlsProps) {
   const [helpDialogOpen, setHelpDialogOpen] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState("")
-  const [localModifiedFeatures, setLocalModifiedFeatures] = useState<FeatureActivation[]>([])
+  const [localModifiedFeatures, setLocalModifiedFeatures] = useState<Feature[]>([])
   // Replace multiple loading states with a single state machine
-  const [loadingState, setLoadingState] = useState<LoadingStateInfo<ControlsLoadingState>>(
-    createLoadingState(ControlsLoadingState.IDLE)
+  const [loadingState, setLoadingState] = useState<LoadingStateInfo<AppLoadingState>>(
+    createLoadingState(AppLoadingState.IDLE)
   );
   const [selectedTab, setSelectedTab] = useState("activated")
-  const [searchResults, setSearchResults] = useState<FeatureActivation[]>([])
+  const [searchResults, setSearchResults] = useState<Feature[]>([])
   
   // New state for selected feature
-  const [selectedFeature, setSelectedFeature] = useState<FeatureActivation | null>(null);
+  const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
   
   // Computed properties for backward compatibility
-  const isLoadingModified = loadingState.state === ControlsLoadingState.LOADING_MODIFIED;
-  const isSearching = loadingState.state === ControlsLoadingState.SEARCHING;
+  const isLoadingModified = loadingState.state === AppLoadingState.CONTROLS_LOADING_MODIFIED;
+  const isSearching = loadingState.state === AppLoadingState.FEATURES_SEARCHING;
 
   // Process modifiedFeatures from context to local state
   useEffect(() => {
     const fetchModifiedFeatures = async () => {
-      setLoadingState(createLoadingState(ControlsLoadingState.LOADING_MODIFIED));
+      setLoadingState(createLoadingState(AppLoadingState.CONTROLS_LOADING_MODIFIED));
       
       try {
         const allModifiedFeatures = getAllModifiedFeatures();
         if (allModifiedFeatures.size > 0) {
-          // Convert Map to FeatureActivation array
-          const features: FeatureActivation[] = Array.from(allModifiedFeatures.entries())
-            .map(([label, value]) => ({
+          // Convert Map to Feature array
+          const features: Feature[] = Array.from(allModifiedFeatures.entries())
+            .map(([label, value], index) => ({
               label,
+              uuid: `modified_${label}_${index}`,
+              indexInSae: index,
               activation: 0, // Base activation is not relevant here
-              modifiedActivation: value
+              modification: value,
+              isModified: value !== 0,
+              hasPending: false
             }));
           setLocalModifiedFeatures(features);
           logger.debug('Updated local modified features from context', { 
@@ -87,11 +91,11 @@ export function Controls({ variantId = "default" }: ControlsProps) {
         logger.error('Failed to process modified features', { error });
         setLocalModifiedFeatures([]);
         setLoadingState(createLoadingState(
-          ControlsLoadingState.IDLE, 
+          AppLoadingState.ERROR, 
           error instanceof Error ? error : new Error(String(error))
         ));
       } finally {
-        setLoadingState(createLoadingState(ControlsLoadingState.IDLE));
+        setLoadingState(createLoadingState(AppLoadingState.IDLE));
       }
     };
 
@@ -103,7 +107,7 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     setSelectedFeature(null);
   }, [selectedTab]);
 
-  const handleSelectFeature = (feature: FeatureActivation) => {
+  const handleSelectFeature = (feature: Feature) => {
     setSelectedFeature(prevSelected => {
       // If already selected, deselect it
       if (prevSelected?.label === feature.label) {
@@ -122,21 +126,22 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     setAutoSteerEnabled(enabled);
   };
 
-  const handleSteer = async (response: SteerFeatureResponse) => {
-    setLoadingState(createLoadingState(ControlsLoadingState.STEERING));
+  const handleSteer = async (steeredFeature: Feature) => {
+    setLoadingState(createLoadingState(AppLoadingState.FEATURES_STEERING));
     
     try {
-      logger.debug('Handling steer response', { response });
+      logger.debug('Handling steer response', { steeredFeature });
       
       // Update the feature in the appropriate list based on the current tab
       if (selectedTab === "search") {
         // For search results, we need to update the local state
         setSearchResults(prev => 
           prev.map(f => {
-            if (f.label === response.label) {
+            if (f.label === steeredFeature.label) {
               return { 
                 ...f, 
-                modifiedActivation: response.activation 
+                modification: steeredFeature.modification,
+                isModified: steeredFeature.isModified
               };
             }
             return f;
@@ -148,10 +153,11 @@ export function Controls({ variantId = "default" }: ControlsProps) {
       }
       
       // Update the selected feature state if needed
-      if (selectedFeature && selectedFeature.label === response.label) {
+      if (selectedFeature && selectedFeature.label === steeredFeature.label) {
         setSelectedFeature({
           ...selectedFeature,
-          modifiedActivation: response.activation
+          modification: steeredFeature.modification,
+          isModified: steeredFeature.isModified
         });
       }
 
@@ -164,27 +170,29 @@ export function Controls({ variantId = "default" }: ControlsProps) {
     } catch (error) {
       logger.error('Failed to handle steer response', { error });
       setLoadingState(createLoadingState(
-        ControlsLoadingState.IDLE,
+        AppLoadingState.ERROR,
         error instanceof Error ? error : new Error(String(error))
       ));
     } finally {
-      setLoadingState(createLoadingState(ControlsLoadingState.IDLE));
+      setLoadingState(createLoadingState(AppLoadingState.IDLE));
     }
   }
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     
-    setLoadingState(createLoadingState(ControlsLoadingState.SEARCHING));
+    setLoadingState(createLoadingState(AppLoadingState.FEATURES_SEARCHING));
     
     try {
       logger.debug("Searching for features with query", { query: searchQuery });
-      const results = await featuresApi.searchFeatures({
-        query: searchQuery,
-        session_id: "default_session",
-        variant_id: variantId,
-        top_k: 10
-      });
+      const searchResult = await featuresApi.searchFeatures(
+        searchQuery,
+        "default_session",
+        variantId,
+        10
+      );
+      
+      const results = searchResult.features;
       
       // Initialize with modifiedActivation from our centralized store
       const resultsWithModified = results.map(feature => {
@@ -201,11 +209,11 @@ export function Controls({ variantId = "default" }: ControlsProps) {
       logger.error("Error searching features", { error });
       setSearchResults([]);
       setLoadingState(createLoadingState(
-        ControlsLoadingState.IDLE,
+        AppLoadingState.ERROR,
         error instanceof Error ? error : new Error(String(error))
       ));
     } finally {
-      setLoadingState(createLoadingState(ControlsLoadingState.IDLE));
+      setLoadingState(createLoadingState(AppLoadingState.IDLE));
     }
   }
 

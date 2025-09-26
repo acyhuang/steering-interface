@@ -146,12 +146,31 @@ class AppliedFeature(BaseModel):
     
     Attributes:
         label: Feature identifier
-        value: Applied steering value
+        activation: Base activation value (matches frontend ApiFeature interface)
+        modified_value: Applied steering value (matches frontend ApiFeature interface)
         category: Feature category
     """
     label: str
-    value: float
+    activation: float  # Base activation value, required by frontend ApiFeature
+    modified_value: float  # Applied steering value
     category: str
+
+class ComparisonResult(BaseModel):
+    """Unified model for steering comparison results.
+    
+    Used for both automatic and manual steering results.
+    Replaces the legacy AutoSteerResult with a more flexible approach.
+    
+    Attributes:
+        original_content: The original content before steering
+        steered_content: The content after steering modifications
+        applied_features: List of features that were applied
+        source: Whether this was from manual or automatic steering
+    """
+    original_content: str
+    steered_content: str
+    applied_features: List[AppliedFeature]
+    source: Literal["manual", "automatic"]
 
 class AutoSteerRequest(BaseModel):
     """Model for auto-steering requests.

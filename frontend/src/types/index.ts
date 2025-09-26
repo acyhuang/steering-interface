@@ -1,10 +1,11 @@
 /**
- * Domain-driven type definitions
+ * Type definitions
  * 
- * This file re-exports all domain-specific types organized by their domain context.
+ * This file re-exports UI types. Domain types should be imported directly
+ * from '@/types/domain' for better clarity and organization.
  */
 
-export * from './shared';
-export * from './conversation';
-export * from './steering';
-export * from './ui'; 
+export * from './ui';
+
+// Note: Legacy shared, conversation, and steering types have been removed.
+// Use domain types from '@/types/domain' instead. 

@@ -1,13 +1,8 @@
 from typing import List, Literal, Optional, Union
 from pydantic import BaseModel, Field
-from .features import SteerFeatureResponse
+from .features import SteerFeatureResponse, ComparisonResult
 from .base_models import ChatMessage
 
-class AutoSteerResult(BaseModel):
-    """Results from auto-steering, including original and steered content"""
-    original_content: str
-    steered_content: str
-    applied_features: List[SteerFeatureResponse]
 
 class ChatStreamChunk(BaseModel):
     """Individual chunk in a streaming response"""
@@ -16,7 +11,7 @@ class ChatStreamChunk(BaseModel):
     delta: Optional[str] = None  # For incremental content
     variant_id: Optional[str] = None
     auto_steered: Optional[bool] = None
-    auto_steer_result: Optional[AutoSteerResult] = None
+    comparison_result: Optional[ComparisonResult] = None  # Unified comparison result for all steering operations
     error: Optional[str] = None
 
 class ChatRequest(BaseModel):
@@ -32,5 +27,5 @@ class ChatResponse(BaseModel):
     content: str
     variant_id: str
     auto_steered: bool = False
-    auto_steer_result: Optional[AutoSteerResult] = None
-    variant_json: Optional[str] = None  # Add missing field from existing usage
+    comparison_result: Optional[ComparisonResult] = None  # Unified comparison result for all steering operations
+    variant_json: Optional[str] = None

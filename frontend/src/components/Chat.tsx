@@ -2,8 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
-import { ChatMessage } from '@/types/conversation';
-import { ChatStreamChunk } from '@/types/conversation';
+import { ChatMessage, createChatMessage } from '@/types/domain';
 import { chatApi, featuresApi } from '@/lib/api';
 import { Textarea } from './ui/textarea';
 import { useVariant } from '@/hooks/useVariant';
@@ -11,7 +10,7 @@ import { useFeatureActivations } from '@/contexts/ActivatedFeatureContext';
 import { createLogger } from '@/lib/logger';
 import { ComparisonView } from './ComparisonView';
 import { SuggestedPrompts } from './SuggestedPrompts';
-import { ChatLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui';
+import { AppLoadingState, LoadingStateInfo, createLoadingState } from '@/types/ui';
 import ReactMarkdown from 'react-markdown';
 import { ArrowUp } from 'lucide-react';
 
@@ -37,15 +36,15 @@ export function Chat({ onVariantChange }: ChatProps) {
   const { setActiveFeatures, setFeatureClusters } = useFeatureActivations();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [loadingState, setLoadingState] = useState<LoadingStateInfo<ChatLoadingState>>(
-    createLoadingState(ChatLoadingState.IDLE)
+  const [loadingState, setLoadingState] = useState<LoadingStateInfo<AppLoadingState>>(
+    createLoadingState(AppLoadingState.IDLE)
   );
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const wasComparingRef = useRef<boolean>(false);
   const [showSuggestedPrompts, setShowSuggestedPrompts] = useState(true);
 
-  const isLoading = loadingState.state !== ChatLoadingState.IDLE;
+  const isLoading = loadingState.state !== AppLoadingState.IDLE;
 
   useEffect(() => {
     if (isComparingResponses) {
@@ -95,75 +94,72 @@ export function Chat({ onVariantChange }: ChatProps) {
 
   const processFeatures = async (messageList: ChatMessage[]) => {
     try {
-      setLoadingState(createLoadingState(ChatLoadingState.INSPECTING_FEATURES));
+      setLoadingState(createLoadingState(AppLoadingState.CHAT_INSPECTING_FEATURES));
       logger.debug('Inspecting features for messages', { messageCount: messageList.length });
       
-      const features = await featuresApi.inspectFeatures({
-        messages: messageList,
-        session_id: "default_session"
-      });
+      const features = await featuresApi.inspectFeatures(
+        messageList,
+        "default_session",
+        variantId
+      );
       
       logger.debug('Feature inspection completed', { featureCount: features.length });
       setActiveFeatures(features);
       
       if (features.length > 0) {
         logger.debug('Clustering features', { featureCount: features.length });
-        const clusterResponse = await featuresApi.clusterFeatures(
+        const clusters = await featuresApi.clusterFeatures(
           features,
           "default_session",
           variantId
         );
         
-        if (clusterResponse?.clusters) {
+        if (clusters.length > 0) {
           logger.debug('Feature clustering completed', { 
-            clusterCount: clusterResponse.clusters.length 
+            clusterCount: clusters.length 
           });
-          setFeatureClusters(clusterResponse.clusters);
+          setFeatureClusters(clusters);
         }
       }
     } catch (error) {
       logger.error('Failed to process features', { 
         error: error instanceof Error ? { message: error.message } : { raw: String(error) } 
       });
-      setLoadingState(createLoadingState(ChatLoadingState.IDLE, 
+      setLoadingState(createLoadingState(AppLoadingState.ERROR, 
         error instanceof Error ? error : new Error(String(error))
       ));
     } finally {
-      setLoadingState(createLoadingState(ChatLoadingState.IDLE));
+      setLoadingState(createLoadingState(AppLoadingState.IDLE));
     }
   };
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading || isStreaming) return;
 
-    const userMessage: ChatMessage = {
-      role: 'user',
-      content: input,
-    };
+    const userMessage = createChatMessage('user', input);
 
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
-    setLoadingState(createLoadingState(ChatLoadingState.SENDING));
+    setLoadingState(createLoadingState(AppLoadingState.CHAT_SENDING));
     setIsStreaming(true);
 
     // Add a placeholder assistant message for streaming
-    const placeholderAssistantMessage: ChatMessage = {
-      role: 'assistant',
-      content: '',
-    };
+    const placeholderAssistantMessage = createChatMessage('assistant', '');
     setMessages((prev) => [...prev, placeholderAssistantMessage]);
 
     try {
       // Use streaming API with callback
       await chatApi.createStreamingChatCompletionWithCallback(
+        [...messages, userMessage],
+        variantId,
         {
-          messages: [...messages, userMessage],
-          variant_id: variantId,
-          auto_steer: autoSteerEnabled
+          sessionId: "default_session",
+          autoSteer: autoSteerEnabled,
+          stream: true
         },
         // onChunk callback
-        (chunk: ChatStreamChunk) => {
-          if (chunk.type === 'chunk' && chunk.delta) {
+        (chunk) => {
+          if (chunk.delta) {
             // Update the last message in real-time by accumulating content
             setMessages(currentMessages => {
               const updatedMessages = [...currentMessages];
@@ -179,35 +175,32 @@ export function Chat({ onVariantChange }: ChatProps) {
           }
         },
         // onComplete callback
-        async (response) => {
+        async (message, autoSteerResult) => {
           setIsStreaming(false);
 
           // Handle auto-steered responses
-          if (response.auto_steered && response.auto_steer_result) {
+          if (autoSteerResult) {
             logger.info('Received auto-steered streaming response', {
-              hasOriginal: !!response.auto_steer_result.original_content,
-              hasSteered: !!response.auto_steer_result.steered_content,
-              featureCount: response.auto_steer_result.applied_features.length
+              hasOriginal: !!autoSteerResult.originalContent,
+              hasSteered: !!autoSteerResult.steeredContent,
+              featureCount: autoSteerResult.appliedFeatures.length
             });
             
             // Store the original response for comparison
-            setOriginalResponseFromChat(response.auto_steer_result.original_content);
+            setOriginalResponseFromChat(autoSteerResult.originalContent);
             
             // Set the steered response in the variant context
-            setSteeredResponse(response.auto_steer_result.steered_content);
+            setSteeredResponse(autoSteerResult.steeredContent);
             
             // Set pending features from auto-steer suggestions
             const newPendingFeatures = new Map<string, number>();
-            response.auto_steer_result.applied_features.forEach(feature => {
-              newPendingFeatures.set(feature.label, feature.modified_value);
+            autoSteerResult.appliedFeatures.forEach(feature => {
+              newPendingFeatures.set(feature.label, feature.value);
             });
             setPendingFeatures(newPendingFeatures);
             
             // Create assistant messages for both original and steered responses
-            const originalAssistantMessage: ChatMessage = {
-              role: 'assistant',
-              content: response.auto_steer_result.original_content
-            };
+            const originalAssistantMessage = createChatMessage('assistant', autoSteerResult.originalContent);
             
             // Update message list with original response initially
             const updatedMessages = [...messages, userMessage, originalAssistantMessage];
@@ -216,31 +209,24 @@ export function Chat({ onVariantChange }: ChatProps) {
             // Enter comparison mode
             setIsComparingResponses(true);
             
-            if (response.variant_id && response.variant_id !== variantId) {
-              setVariantId(response.variant_id);
-              onVariantChange?.(response.variant_id);
-            }
+            // Note: variantId is already passed to the API, no need to update from response
             
             await processFeatures(updatedMessages);
             return;
           }
 
           // Normal response handling (no auto-steer)
-          const finalAssistantMessage: ChatMessage = {
-            role: 'assistant',
-            content: response.content,
-          };
+          const finalAssistantMessage = createChatMessage('assistant', message.content, {
+            timestamp: message.timestamp
+          });
 
           const updatedMessages = [...messages, userMessage, finalAssistantMessage];
           setMessages(updatedMessages);
           
-          if (response.variant_id && response.variant_id !== variantId) {
-            setVariantId(response.variant_id);
-            onVariantChange?.(response.variant_id);
-          }
+          // Note: variantId is already managed by the context, no need to update from response
           
           await processFeatures(updatedMessages);
-          setLoadingState(createLoadingState(ChatLoadingState.IDLE));
+          setLoadingState(createLoadingState(AppLoadingState.IDLE));
         },
         // onError callback
         (error) => {
@@ -258,7 +244,7 @@ export function Chat({ onVariantChange }: ChatProps) {
             return updatedMessages;
           });
           
-          setLoadingState(createLoadingState(ChatLoadingState.IDLE, 
+          setLoadingState(createLoadingState(AppLoadingState.IDLE, 
             error instanceof Error ? error : new Error(String(error))
           ));
         }
@@ -278,7 +264,7 @@ export function Chat({ onVariantChange }: ChatProps) {
         return updatedMessages;
       });
       
-      setLoadingState(createLoadingState(ChatLoadingState.IDLE, 
+      setLoadingState(createLoadingState(AppLoadingState.ERROR, 
         error instanceof Error ? error : new Error(String(error))
       ));
     }
@@ -288,7 +274,7 @@ export function Chat({ onVariantChange }: ChatProps) {
     if (messages.length < 2) return;
 
     logger.debug('Starting regenerateLastMessage', { messageCount: messages.length });
-    setLoadingState(createLoadingState(ChatLoadingState.REGENERATING));
+    setLoadingState(createLoadingState(AppLoadingState.CHAT_REGENERATING));
     
     const lastUserIndex = [...messages].reverse().findIndex(m => m.role === 'user');
     if (lastUserIndex === -1) return;
@@ -309,16 +295,16 @@ export function Chat({ onVariantChange }: ChatProps) {
           logger.error('Error during generateSteeredResponse', {
             error: genError instanceof Error ? { message: genError.message } : { raw: String(genError) }
           });
-          setLoadingState(createLoadingState(ChatLoadingState.IDLE, 
+          setLoadingState(createLoadingState(AppLoadingState.IDLE, 
             genError instanceof Error ? genError : new Error(String(genError))
           ));
         }
         
-        setLoadingState(createLoadingState(ChatLoadingState.IDLE));
+        setLoadingState(createLoadingState(AppLoadingState.IDLE));
         return;
       }
     } finally {
-      setLoadingState(createLoadingState(ChatLoadingState.IDLE));
+      setLoadingState(createLoadingState(AppLoadingState.IDLE));
     }
   }, [
     messages, 
@@ -365,11 +351,11 @@ export function Chat({ onVariantChange }: ChatProps) {
 
   const getLoadingMessage = () => {
     switch (loadingState.state) {
-      case ChatLoadingState.REGENERATING:
+      case AppLoadingState.CHAT_REGENERATING:
         return "Regenerating response...";
-      case ChatLoadingState.SENDING:
+      case AppLoadingState.CHAT_SENDING:
         return "Generating response...";
-      case ChatLoadingState.INSPECTING_FEATURES:
+      case AppLoadingState.CHAT_INSPECTING_FEATURES:
         return "Inspecting features...";
       default:
         return "Loading...";

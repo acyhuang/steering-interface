@@ -139,18 +139,21 @@ The backend is organized using a hybrid approach with a main facade service and 
 
 The application uses several context providers to manage different aspects of application state:
 
-**FeatureProvider:**
-- Manages feature modifications for steering LLM outputs
-- Stores feature labels and their steering values
-- Provides functions to set, clear, and retrieve feature modifications
-- Implemented in `frontend/src/contexts/FeatureContext.tsx`
-
 **VariantContext:**
 - Manages variant state and steering comparison workflow
 - Tracks pending and confirmed feature changes
 - Maintains original and steered responses for comparison
 - Provides methods for applying, confirming, and canceling steering actions
+- Manages feature modifications for steering LLM outputs (consolidated from former FeatureProvider)
+- Handles auto-steer functionality and state management
 - Implemented in `frontend/src/contexts/VariantContext.tsx`
+
+**ActivatedFeatureContext:**
+- Manages currently active features and their display state
+- Handles feature clustering for organization
+- Provides feature activation lookup functionality
+- Refreshes feature data when variant state changes
+- Implemented in `frontend/src/contexts/ActivatedFeatureContext.tsx`
 
 
 ### State Flow Architecture
@@ -159,9 +162,9 @@ The application's state flow follows a clear hierarchy:
 
 ```mermaid
 graph TD
-    A[App Component] --> B[FeatureProvider]
-    B --> V[VariantProvider]
-    V --> D[Component Tree]
+    A[App Component] --> V[VariantProvider]
+    V --> AF[ActivatedFeatureProvider]
+    AF --> D[Component Tree]
     D --> E[Chat Component]
     D --> F[Controls Component]
     D --> G[ComparisonView Component]
@@ -169,16 +172,19 @@ graph TD
     F -- "Feature Adjustment" --> V
     V -- "Response Comparison" --> G
     G -- "Confirmation/Rejection" --> V
+    V -- "Feature Updates" --> AF
 ```
 
 **State Access Pattern:**
 - Components use custom hooks to access context state
-- For example: `useFeatureModifications()` provides access to feature state
+- `useVariant()` provides access to variant state, feature modifications, and steering functionality
+- `useContext(ActivatedFeatureContext)` provides access to active features and clusters
 - This pattern encapsulates state access logic and ensures proper context usage
 
 **State Persistence:**
 - UI preferences stored in localStorage (e.g., split panel sizes)
-- Feature modifications maintained in Context during the session
+- Feature modifications maintained in VariantContext during the session
+- Active features and clusters cached in ActivatedFeatureContext with automatic refresh
 - Chat messages managed in local state with parent component coordination
 
 ## Development Infrastructure

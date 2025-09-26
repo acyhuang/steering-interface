@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FeatureActivation, SteerFeatureResponse } from "@/types/steering/feature";
+import { Feature } from "@/types/domain";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { createLogger } from "@/lib/logger";
@@ -13,8 +13,8 @@ const logger = createLogger('FeatureEditor');
 const DISCRETE_VALUES = [-0.8, -0.4, 0, 0.4, 0.8];
 
 interface FeatureEditorProps {
-  feature: FeatureActivation | null;
-  onSteer?: (response: SteerFeatureResponse) => void;
+  feature: Feature | null;
+  onSteer?: (steeredFeature: Feature) => void;
   onClose: () => void;
 }
 
@@ -34,7 +34,7 @@ export function FeatureEditor({
     const contextValue = feature ? getFeatureModification(feature.label) : null;
     if (contextValue !== null) return [contextValue];
     
-    return feature.modifiedActivation !== undefined ? [feature.modifiedActivation] : [0];
+    return [feature.modification];
   });
 
   // Update slider when selected feature changes
@@ -48,7 +48,7 @@ export function FeatureEditor({
     const contextValue = getFeatureModification(feature.label);
     const value = contextValue !== null 
       ? contextValue
-      : (feature.modifiedActivation !== undefined ? feature.modifiedActivation : 0);
+      : feature.modification;
     
     setSliderValue([value]);
   }, [feature, getFeatureModification]);
@@ -81,29 +81,37 @@ export function FeatureEditor({
 
       // If the slider is at 0, clear the feature
       if (steeringValue === 0) {
-        const response = await featuresApi.clearFeature({
-          session_id: "default_session",
-          variant_id: variantId,
-          feature_label: feature.label
-        });
+        await featuresApi.clearFeature(
+          feature.label,
+          "default_session",
+          variantId
+        );
 
         logger.debug('Feature cleared from the backend', { feature: feature.label });
         
         if (onSteer) {
-          onSteer({ 
-            label: response.label,
-            activation: 0,
-            modified_value: 0
-          });
+          // Create updated feature with cleared modification
+          const clearedFeature: Feature = {
+            ...feature,
+            modification: 0,
+            isModified: false,
+            hasPending: false
+          };
+          onSteer(clearedFeature);
         }
       } else {
         // Otherwise apply the new value to the backend
-        const response = await featuresApi.steerFeature({
-          session_id: "default_session",
-          variant_id: variantId,
-          feature_label: feature.label,
-          value: steeringValue
-        });
+        const featureToSteer: Feature = {
+          ...feature,
+          pendingModification: steeringValue,
+          hasPending: true
+        };
+        
+        const steeredFeature = await featuresApi.steerFeature(
+          featureToSteer,
+          "default_session",
+          variantId
+        );
 
         logger.debug('Feature steered in the backend', { 
           feature: feature.label, 
@@ -111,7 +119,7 @@ export function FeatureEditor({
         });
         
         if (onSteer) {
-          onSteer(response);
+          onSteer(steeredFeature);
         }
       }
     } catch (error) {
@@ -127,7 +135,7 @@ export function FeatureEditor({
   const contextValue = getFeatureModification(feature.label);
   const currentValue = contextValue !== null 
     ? contextValue
-    : (feature.modifiedActivation !== undefined ? feature.modifiedActivation : 0);
+    : feature.modification;
 
   return (
     <div className="pt-2 mt-1 border-t bg-inherit">

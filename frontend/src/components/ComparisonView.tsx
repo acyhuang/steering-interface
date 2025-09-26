@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useVariant } from '@/hooks/useVariant';
 import { createLogger } from '@/lib/logger';
-import { SteeringLoadingState } from '@/types/ui';
+import { AppLoadingState } from '@/types/ui/states';
 import ReactMarkdown from 'react-markdown';
 
 interface ComparisonViewProps {
@@ -54,18 +54,18 @@ export function ComparisonView({ className, refreshFeatures }: ComparisonViewPro
   };
 
   // Check if we're in a generating state
-  const isGenerating = steeringState.state === SteeringLoadingState.GENERATING_RESPONSE;
+  const isGenerating = steeringState.state === AppLoadingState.STEERING_GENERATING_RESPONSE;
   
   // Check if we're in a confirming or canceling state
   const isProcessing = 
-    steeringState.state === SteeringLoadingState.CONFIRMING || 
-    steeringState.state === SteeringLoadingState.CANCELING;
+    steeringState.state === AppLoadingState.STEERING_CONFIRMING || 
+    steeringState.state === AppLoadingState.STEERING_CANCELING;
 
   // Show comparison view immediately when generating, with streaming content
   // const showComparison = originalResponse && (steeredResponse || isGenerating); // Unused variable
 
   if (isProcessing) {
-    const actionText = steeringState.state === SteeringLoadingState.CONFIRMING 
+    const actionText = steeringState.state === AppLoadingState.STEERING_CONFIRMING 
       ? "Confirming" 
       : "Canceling";
       
