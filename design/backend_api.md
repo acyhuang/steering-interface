@@ -33,7 +33,7 @@ API response DTO
 class Feature:
     uuid: str
     label: str
-    activation: int
+    activation: float
     modification: float
     pendingModification: float
 
