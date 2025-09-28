@@ -46,19 +46,27 @@ class Feature:
 - confirm modification
 - send message, receive response
 
+## API endpoints
 
-POST /conversation/create (create)
-GET /conversation/{id} (fetch)
-POST /conversation/{id}/messages (send message)
-
+POST /conversations (create)
+<!-- TODO: GET /conversations/{id} (fetch) -->
+POST /conversations/{id}/messages (send message)
 GET /conversations/{id}/features (fetch features)
+GET /conversations/{id}/table-features (fetch table features)
 
 POST/variants (create)
-GET /variant/{id} (fetch)
-DELETE /variant/{id} (delete)
-POST /conversations/{id}/switch-variant (switch variant)
+<!-- TODO: GET /variant/{id} (fetch) -->
+<!-- TODO: DELETE /variant/{id} (delete) -->
+<!-- TODO: POST /conversations/{id}/switch-variant (switch variant) -->
 
 POST /variants/{id}/features/{uuid}/steer (steer feature)
 POST /variants/{id}/commit-changes (confirm pending)
 POST /variants/{id}/reject-changes (reject pending)
-DELETE /variants/{id}/modifications (clear modifications)
+<!-- TODO: DELETE /variants/{id}/modifications (clear modifications) -->
+
+## TODO for v2.1
+Local storage
+- store conversations, variants
+- use dependency injection (like ember client)
+active sync between Ember variant and our variant model
+- currently using lazy reconstruction

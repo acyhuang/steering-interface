@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
     DEBUG: bool = False
 
-    ALLOWED_ORIGINS: string = ""
+    ALLOWED_ORIGINS: str = ""
 
     OPENAI_API_KEY: str = ""
     EMBER_API_KEY: str = ""
@@ -16,7 +16,7 @@ class Settings(BaseSettings):
         return v.split(",") if v else []
 
     class Config:
-            env_file = ".env"
+            env_file = ["backend/.env", ".env"] 
             env_file_encoding = "utf-8"
             case_sensitive = True
 

@@ -36,3 +36,7 @@ class ConversationMessageRequest(BaseModel):
 class ConversationMessageResponse(BaseModel):
     """Response after sending a message in the conversation"""
     message: ChatMessage
+
+class ConversationMessageStreamResponse(BaseModel):
+    """Streaming response chunk for real-time message generation"""
+    content: str

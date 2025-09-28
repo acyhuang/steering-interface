@@ -7,7 +7,7 @@ from pydantic import BaseModel
 class Conversation(BaseModel):
     uuid: str
     current_variant: Variant
-    detected_features: List[Feature]
+    activated_features: List[Feature]
     
 class Feature(BaseModel):
     uuid: str

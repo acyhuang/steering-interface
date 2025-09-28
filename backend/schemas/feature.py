@@ -23,3 +23,14 @@ class VariantSteerResponse(BaseModel):
     success: bool
     feature_uuid: str
     pending_modification: float
+
+class UnifiedFeature(BaseModel):
+    """
+    Unified feature representation combining Ember SDK data with modifications.
+    Used for API responses showing complete feature state.
+    """
+    uuid: str
+    label: str
+    activation: Optional[float] = None
+    modification: Optional[float] = 0.0
+    pending_modification: Optional[float] = None
