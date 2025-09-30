@@ -16,6 +16,7 @@ interface ChatProps {
   onRejectChanges: () => Promise<void>
   isStreaming: boolean
   featuresLoading: boolean
+  isDeveloperMode: boolean
 }
 
 export default function Chat({
@@ -28,7 +29,8 @@ export default function Chat({
   onConfirmChanges,
   onRejectChanges,
   isStreaming,
-  featuresLoading
+  featuresLoading,
+  isDeveloperMode
 }: ChatProps) {
   const [inputMessage, setInputMessage] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -93,16 +95,18 @@ export default function Chat({
   return (
     <div className="h-full flex flex-col relative">
       {/* Debug Overlay */}
-      <div className="absolute top-2 right-2 z-10 bg-background/50 backdrop-blur-sm border rounded-lg p-2 text-xs text-muted-foreground shadow-sm">
-        <div className="space-y-1">
-          <div><strong>Conversation:</strong> {conversation.id || 'Loading...'}</div>
-          <div><strong>Variant:</strong> {conversation.currentVariant?.label || 'None'}</div>
-          <div><strong>Messages:</strong> {conversation.messages.length}</div>
-          <div><strong>Streaming:</strong> {isStreaming ? 'Yes' : 'No'}</div>
-          <div><strong>Features:</strong> {featuresLoading ? 'Loading...' : 'Ready'}</div>
-          <div><strong>Comparison:</strong> {isInComparisonMode ? 'Active' : 'Off'}</div>
+      {isDeveloperMode && (
+        <div className="absolute top-2 right-2 z-10 bg-background/50 backdrop-blur-sm border rounded-lg p-2 text-xs text-muted-foreground shadow-sm">
+          <div className="space-y-1">
+            <div><strong>Conversation:</strong> {conversation.id || 'Loading...'}</div>
+            <div><strong>Variant:</strong> {conversation.currentVariant?.label || 'None'}</div>
+            <div><strong>Messages:</strong> {conversation.messages.length}</div>
+            <div><strong>Streaming:</strong> {isStreaming ? 'Yes' : 'No'}</div>
+            <div><strong>Features:</strong> {featuresLoading ? 'Loading...' : 'Ready'}</div>
+            <div><strong>Comparison:</strong> {isInComparisonMode ? 'Active' : 'Off'}</div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Messages Area */}
       <div className="flex-1 overflow-hidden">

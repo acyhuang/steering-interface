@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Sidebar, Moon, Sun } from 'lucide-react'
+import { PanelRight, Moon, Sun, Code } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { conversationApi, variantApi } from '@/services/api'
 import type { ConversationState, UnifiedFeature } from '@/types'
@@ -26,6 +26,7 @@ function App() {
   const [originalResponseForComparison, setOriginalResponseForComparison] = useState<string>('')
   const [isControlsVisible, setIsControlsVisible] = useState(true)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [isDeveloperMode, setIsDeveloperMode] = useState(false)
 
   // Prevent duplicate initialization in React StrictMode
   const hasInitialized = useRef(false)
@@ -364,12 +365,24 @@ function App() {
     localStorage.setItem('darkMode', newDarkMode.toString())
   }
 
+  const toggleDeveloperMode = () => {
+    setIsDeveloperMode(!isDeveloperMode)
+  }
+
   return (
     <div className="h-screen flex flex-col">
       {/* Navigation Bar */}
       <nav className="bg-background border-b border-border px-4 py-3 flex justify-between items-center">
         <span className="text-xl font-medium">steering-interface</span>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleDeveloperMode}
+            className={`p-2 ${isDeveloperMode ? 'bg-muted' : ''}`}
+          >
+            <Code className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -382,9 +395,11 @@ function App() {
             variant="ghost"
             size="sm"
             onClick={toggleControls}
-            className="p-2"
+            className={`p-2 ${isControlsVisible ? 'bg-muted' : ''}`}
           >
-            <Sidebar className="h-4 w-4" />
+            <PanelRight
+              className="h-4 w-4"
+            />
           </Button>
         </div>
       </nav>
@@ -404,6 +419,7 @@ function App() {
             onRejectChanges={handleRejectChanges}
             isStreaming={isStreaming}
             featuresLoading={featuresLoading}
+            isDeveloperMode={isDeveloperMode}
           />
         </div>
 
@@ -416,6 +432,7 @@ function App() {
               onFeatureSelect={handleFeatureSelect}
               onSteer={handleSteer}
               isLoading={featuresLoading || steeringLoading}
+              isDeveloperMode={isDeveloperMode}
             />
           </div>
         )}
