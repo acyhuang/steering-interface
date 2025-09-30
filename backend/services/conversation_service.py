@@ -230,7 +230,7 @@ class ConversationService:
             try:
                 # Create unified feature using variant service helper
                 unified_feature = variant_service.create_unified_feature(
-                    feature_uuid=activation.feature.uuid,
+                    feature_uuid=str(activation.feature.uuid), 
                     label=activation.feature.label,
                     activation=activation.activation,
                     variant_id=variant_summary.uuid
@@ -242,7 +242,7 @@ class ConversationService:
                 if conversation_id not in self._conversation_activated_features:
                     self._conversation_activated_features[conversation_id] = {}
                 
-                self._conversation_activated_features[conversation_id][activation.feature.uuid] = activation.feature.label
+                self._conversation_activated_features[conversation_id][str(activation.feature.uuid)] = activation.feature.label
                 
             except Exception as e:
                 logger.error(f"Error processing feature {activation.feature.uuid}: {str(e)}")
@@ -314,31 +314,38 @@ class ConversationService:
         # Fetch data for missing modified features
         table_features = activated_features.copy()
         
-        for feature_uuid in missing_modified_uuids:
+        if missing_modified_uuids:
             try:
-                # Get feature label from Ember SDK
-                feature_list = await ember_client.features._list(ids=[feature_uuid])
-                if not feature_list or len(feature_list) == 0:
-                    logger.warning(f"Modified feature {feature_uuid} not found in Ember SDK")
-                    continue
+                # Get all missing feature labels in one batch request
+                feature_list = await ember_client.features._list(ids=list(missing_modified_uuids))
+                feature_dict = {str(f.uuid): f for f in feature_list}
                 
-                feature = feature_list[0]
-                
-                # Create unified feature using variant service helper (no activation since it wasn't in recent inspection)
-                unified_feature = variant_service.create_unified_feature(
-                    feature_uuid=feature_uuid,
-                    label=feature.label,
-                    activation=None,  # Not recently activated
-                    variant_id=variant_id
-                )
-                
-                table_features.append(unified_feature)
-                logger.debug(f"Added modified feature {feature_uuid} to table")
-                
+                for feature_uuid in missing_modified_uuids:
+                    try:
+                        feature = feature_dict.get(feature_uuid)
+                        if not feature:
+                            logger.warning(f"Modified feature {feature_uuid} not found in Ember SDK")
+                            continue
+                        
+                        # Create unified feature using variant service helper (no activation since it wasn't in recent inspection)
+                        unified_feature = variant_service.create_unified_feature(
+                            feature_uuid=feature_uuid,
+                            label=feature.label,
+                            activation=None,  # Not recently activated
+                            variant_id=variant_id
+                        )
+                        
+                        table_features.append(unified_feature)
+                        logger.debug(f"Added modified feature {feature_uuid} to table")
+                        
+                    except Exception as e:
+                        logger.error(f"Error processing modified feature {feature_uuid}: {str(e)}")
+                        # Continue with other features rather than failing entirely
+                        continue
+                        
             except Exception as e:
-                logger.error(f"Error fetching data for modified feature {feature_uuid}: {str(e)}")
-                # Continue with other features rather than failing entirely
-                continue
+                logger.error(f"Error fetching batch of modified features: {str(e)}")
+                # Continue without the missing features rather than failing entirely
         
         logger.info(f"Successfully compiled {len(table_features)} features for table (conversation {conversation_id})")
         return table_features

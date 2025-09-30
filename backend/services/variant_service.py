@@ -284,11 +284,13 @@ class VariantService:
             variant_id = DEMO_VARIANT_ID
         
         # Get modification and pending modification data
-        modification = self._variant_modified_features.get(variant_id, {}).get(feature_uuid, 0.0)
-        pending_modification = self._variant_pending_features.get(variant_id, {}).get(feature_uuid)
+
+        feature_uuid_str = str(feature_uuid)
+        modification = self._variant_modified_features.get(variant_id, {}).get(feature_uuid_str, 0.0)
+        pending_modification = self._variant_pending_features.get(variant_id, {}).get(feature_uuid_str)
         
         return UnifiedFeature(
-            uuid=feature_uuid,
+            uuid=feature_uuid_str,
             label=label,
             activation=activation,
             modification=modification,
