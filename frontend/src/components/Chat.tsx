@@ -4,6 +4,7 @@ import type { ConversationState, ChatMessage } from '@/types'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import MessageContent from './MessageContent'
 
 interface ChatProps {
   conversation: ConversationState
@@ -86,7 +87,7 @@ export default function Chat({
               : 'text-foreground'
           }`}
         >
-          <div className="whitespace-pre-wrap">{message.content}</div>
+          <MessageContent message={message} />
         </div>
       </div>
     )
@@ -145,7 +146,9 @@ export default function Chat({
                         onClick={onRejectChanges}
                       >
                         <div className="text-sm font-medium mb-2 text-sm text-muted-foreground text-center font-mono">ORIGINAL RESPONSE</div>
-                        <div className="whitespace-pre-wrap text-base text-foreground">{originalResponseForComparison}</div>
+                        <div className="text-base text-foreground">
+                          <MessageContent message={{ role: 'assistant', content: originalResponseForComparison }} />
+                        </div>
                       </div>
                       
                       {/* Steered Response Card */}
@@ -156,11 +159,12 @@ export default function Chat({
                         onClick={isComparisonStreaming ? undefined : onConfirmChanges}
                       >
                         <div className="text-sm font-medium text-sm mb-2 text-muted-foreground text-center gap-2 text-center font-mono">STEERED RESPONSE</div>
-                        <div className="whitespace-pre-wrap text-base text-foreground">
-                          {comparisonResponse}
-                          {isComparisonStreaming && !comparisonResponse && (
+                        <div className="text-base text-foreground">
+                          {comparisonResponse ? (
+                            <MessageContent message={{ role: 'assistant', content: comparisonResponse }} />
+                          ) : isComparisonStreaming ? (
                             <span className="text-muted-foreground italic">Generating steered response...</span>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     </div>
