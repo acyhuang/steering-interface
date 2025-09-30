@@ -82,6 +82,7 @@ class ConversationService:
         conversation_id: str,
         messages: List[ChatMessage],
         ember_client: AsyncClient,
+        variant_service: VariantService,
         stream: bool = True
     ) -> AsyncGenerator[str, None]:
         """
@@ -91,6 +92,7 @@ class ConversationService:
             conversation_id: UUID of the conversation
             messages: List of chat messages (full conversation history)
             ember_client: Ember SDK client for API interactions
+            variant_service: Variant service for accessing feature modifications
             stream: Whether to stream the response (currently always True for MVP)
             
         Yields:
@@ -113,13 +115,39 @@ class ConversationService:
         # Convert Pydantic models to dicts for Ember SDK
         ember_messages = [msg.model_dump() for msg in messages]
         
-        # v2.0: Create variant with demo configuration
-        # TODO: Retrieve actual variant modifications when variant service exists
+        # v2.0: Create variant with demo configuration and apply modifications
         variant = goodfire.Variant(DEFAULT_BASE_MODEL)
-        # TODO: Apply feature modifications from variant:
-        # for feature_uuid, modification_value in variant.modified_features.items():
-        #     feature = ember_client.features.get(feature_uuid)
-        #     variant.set(feature, modification_value)
+        
+        # Get current variant ID from conversation (hardcoded for demo)
+        from ..core.constants import DEMO_VARIANT_ID
+        variant_id = DEMO_VARIANT_ID
+        
+        # Apply confirmed modifications
+        confirmed_modifications = variant_service._variant_modified_features.get(variant_id, {})
+        
+        # Apply pending modifications (these take precedence over confirmed ones)
+        pending_modifications = variant_service._variant_pending_features.get(variant_id, {})
+        
+        # Combine modifications (pending overrides confirmed for same feature)
+        all_modifications = {**confirmed_modifications, **pending_modifications}
+        
+        if all_modifications:
+            logger.debug(f"Applying {len(all_modifications)} feature modifications to variant")
+            for feature_uuid, modification_value in all_modifications.items():
+                try:
+                    # Get feature from Ember SDK
+                    feature_list = await ember_client.features._list(ids=[feature_uuid])
+                    if feature_list and len(feature_list) > 0:
+                        feature = feature_list[0]
+                        variant.set(feature, modification_value)
+                        logger.debug(f"Applied modification {modification_value} to feature {feature_uuid}")
+                    else:
+                        logger.warning(f"Feature {feature_uuid} not found, skipping modification")
+                except Exception as e:
+                    logger.error(f"Failed to apply modification to feature {feature_uuid}: {str(e)}")
+                    # Continue with other features
+        else:
+            logger.debug("No feature modifications to apply")
         
         logger.debug(f"Created variant with base model: {DEFAULT_BASE_MODEL}")
         

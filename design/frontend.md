@@ -15,7 +15,6 @@
 - Chat.tsx: host chat interface (input, messages)
 - Controls.tsx: hide/show 
     - FeatureTable.tsx: data table of features with header (filter, sort)
-        - FeatureRow.tsx: row in table, shows feature label, activation, modification
     - FeatureEditor.tsx: allows steering on selected feature
 
 ## state manatement

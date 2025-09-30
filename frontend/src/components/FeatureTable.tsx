@@ -63,7 +63,9 @@ export default function FeatureTable({
               >
                 <TableCell className="">{feature.label}</TableCell>
                 <TableCell>{feature.activation !== null ? feature.activation.toFixed(1) : '-'}</TableCell>
-                <TableCell>{feature.modification.toFixed(1)}</TableCell>
+                <TableCell className={feature.modification !== 0 ? "font-medium text-foreground" : undefined}>
+                  {feature.modification.toFixed(1)}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

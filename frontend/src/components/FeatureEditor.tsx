@@ -42,14 +42,12 @@ export default function FeatureEditor({
   }
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="text-lg font-medium">Feature Editor</div>
-      
-      <div className="space-y-2 text-sm">
-        <p><strong>Feature:</strong> {feature.label}</p>
-        <p><strong>Activation:</strong> {feature.activation !== null ? feature.activation.toFixed(1) : '-'}</p>
-        <p><strong>Current Modification:</strong> {feature.modification.toFixed(1)}</p>
-        <p><strong>Pending:</strong> {feature.pending_modification !== null ? feature.pending_modification.toFixed(1) : '-'}</p>
+    <div className="p-4 space-y-2">
+      <div className="text-base font-medium">{feature.label}</div>
+      <div className="space-y-2 text-sm flex gap-4 text-muted-foreground">
+        <p>Activation: {feature.activation !== null ? feature.activation.toFixed(1) : '-'}</p>
+        <p>Current Modification: {feature.modification.toFixed(1)}</p>
+        <p>Pending: {feature.pending_modification !== null ? feature.pending_modification.toFixed(1) : '-'}</p>
       </div>
 
       <div className="space-y-3">

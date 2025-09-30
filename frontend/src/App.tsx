@@ -22,6 +22,8 @@ function App() {
   const [selectedFeature, setSelectedFeature] = useState<UnifiedFeature | null>(null)
   const [isInComparisonMode, setIsInComparisonMode] = useState(false)
   const [comparisonResponse, setComparisonResponse] = useState<string>('')
+  const [isComparisonStreaming, setIsComparisonStreaming] = useState(false)
+  const [originalResponseForComparison, setOriginalResponseForComparison] = useState<string>('')
   const [isControlsVisible, setIsControlsVisible] = useState(true)
 
   // Prevent duplicate initialization in React StrictMode
@@ -144,6 +146,66 @@ function App() {
     setSelectedFeature(feature)
   }
 
+  const generateComparisonResponse = async (freshFeatures: UnifiedFeature[]) => {
+    // Check if we have pending modifications
+    const hasPendingModifications = freshFeatures.some(f => f.pending_modification !== null)
+    
+    if (!hasPendingModifications || conversation.messages.length === 0) {
+      return
+    }
+
+    // Find the last assistant message to use as comparison basis
+    const lastAssistantMessage = [...conversation.messages].reverse().find((m: any) => m.role === 'assistant')
+    const lastUserMessage = [...conversation.messages].reverse().find((m: any) => m.role === 'user')
+    
+    if (!lastAssistantMessage || !lastUserMessage) {
+      console.log('No assistant or user message found for comparison')
+      return
+    }
+
+    try {
+      console.log('Starting streaming comparison response with pending modifications')
+      
+      // Immediately enter comparison mode with the original response
+      setOriginalResponseForComparison(lastAssistantMessage.content)
+      setComparisonResponse('') // Start empty, will stream in
+      setIsInComparisonMode(true)
+      setIsComparisonStreaming(true)
+      
+      // Get conversation history up to and including the last user message
+      const lastUserIndex = conversation.messages.indexOf(lastUserMessage)
+      const messagesForComparison = conversation.messages.slice(0, lastUserIndex + 1)
+      
+      // Generate steered response (backend will apply pending modifications)
+      const comparisonStream = await conversationApi.sendMessage(conversation.id!, messagesForComparison)
+      const reader = comparisonStream.getReader()
+      
+      // Stream the comparison response in real-time
+      let streamingComparisonResponse = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        const chunk = new TextDecoder().decode(value)
+        streamingComparisonResponse += chunk
+        
+        // Update the comparison response in real-time
+        setComparisonResponse(streamingComparisonResponse)
+      }
+      
+      setIsComparisonStreaming(false)
+      console.log('Comparison response streaming completed successfully')
+      
+    } catch (error) {
+      console.error('Failed to generate comparison response:', error)
+      // Exit comparison mode on error
+      setIsInComparisonMode(false)
+      setIsComparisonStreaming(false)
+      setComparisonResponse('')
+      setOriginalResponseForComparison('')
+    }
+  }
+
   const handleSteer = async (featureUuid: string, value: number) => {
     if (!conversation.currentVariant) {
       console.error('No current variant available for steering')
@@ -173,6 +235,9 @@ function App() {
             setSelectedFeature(updatedFeature)
           }
         }
+        
+        // Generate comparison response if we have pending modifications
+        await generateComparisonResponse(freshFeatures)
       }
     } catch (error) {
       console.error('Failed to steer feature:', error)
@@ -182,13 +247,77 @@ function App() {
   }
 
   const handleConfirmChanges = async () => {
-    console.log('Confirm changes')
-    // TODO: Implement confirm changes
+    if (!conversation.currentVariant) {
+      console.error('No current variant available for confirming changes')
+      return
+    }
+
+    try {
+      console.log('Confirming changes')
+      
+      // Commit pending modifications
+      await variantApi.commitChanges(conversation.currentVariant.uuid)
+      
+      // Replace the last assistant message with the steered version
+      setConversation(prev => ({
+        ...prev,
+        messages: prev.messages.map((msg, index) => {
+          // Find the last assistant message and replace it
+          const lastAssistantIndex = prev.messages.map((m: any, i: number) => m.role === 'assistant' ? i : -1)
+            .filter(i => i !== -1)
+            .pop() ?? -1
+          return index === lastAssistantIndex && msg.role === 'assistant'
+            ? { ...msg, content: comparisonResponse }
+            : msg
+        })
+      }))
+      
+      // Exit comparison mode
+      setIsInComparisonMode(false)
+      setComparisonResponse('')
+      setIsComparisonStreaming(false)
+      setOriginalResponseForComparison('')
+      
+      // Reload features to get updated state
+      if (conversation.id) {
+        await loadFeatures(conversation.id)
+      }
+      
+      console.log('Changes confirmed successfully')
+      
+    } catch (error) {
+      console.error('Failed to confirm changes:', error)
+    }
   }
 
   const handleRejectChanges = async () => {
-    console.log('Reject changes')
-    // TODO: Implement reject changes
+    if (!conversation.currentVariant) {
+      console.error('No current variant available for rejecting changes')
+      return
+    }
+
+    try {
+      console.log('Rejecting changes')
+      
+      // Reject pending modifications
+      await variantApi.rejectChanges(conversation.currentVariant.uuid)
+      
+      // Exit comparison mode (keep original message)
+      setIsInComparisonMode(false)
+      setComparisonResponse('')
+      setIsComparisonStreaming(false)
+      setOriginalResponseForComparison('')
+      
+      // Reload features to get updated state
+      if (conversation.id) {
+        await loadFeatures(conversation.id)
+      }
+      
+      console.log('Changes rejected successfully')
+      
+    } catch (error) {
+      console.error('Failed to reject changes:', error)
+    }
   }
 
   const toggleControls = () => {
@@ -218,6 +347,8 @@ function App() {
             conversation={conversation}
             isInComparisonMode={isInComparisonMode}
             comparisonResponse={comparisonResponse}
+            originalResponseForComparison={originalResponseForComparison}
+            isComparisonStreaming={isComparisonStreaming}
             onSendMessage={handleSendMessage}
             onConfirmChanges={handleConfirmChanges}
             onRejectChanges={handleRejectChanges}

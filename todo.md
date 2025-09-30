@@ -11,3 +11,4 @@
 - render markdown
 - dark mode
 - frontend debug mode
+- comparison view wider

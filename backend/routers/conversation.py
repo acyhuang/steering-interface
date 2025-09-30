@@ -87,7 +87,8 @@ async def create_conversation(
 async def send_message(
     conversation_id: str,
     request: ConversationMessageRequest,
-    ember_client: AsyncClient = Depends(get_ember_client)
+    ember_client: AsyncClient = Depends(get_ember_client),
+    variant_service: VariantService = Depends(get_variant_service)
 ):
     """
     Send a message to a conversation and receive a streaming response.
@@ -130,6 +131,7 @@ async def send_message(
                     conversation_id=conversation_id,
                     messages=request.messages,
                     ember_client=ember_client,
+                    variant_service=variant_service,
                     stream=request.stream
                 ):
                     yield content_chunk

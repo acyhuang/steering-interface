@@ -9,6 +9,8 @@ interface ChatProps {
   conversation: ConversationState
   isInComparisonMode: boolean
   comparisonResponse: string
+  originalResponseForComparison: string
+  isComparisonStreaming: boolean
   onSendMessage: (content: string) => Promise<void>
   onConfirmChanges: () => Promise<void>
   onRejectChanges: () => Promise<void>
@@ -20,6 +22,8 @@ export default function Chat({
   conversation,
   isInComparisonMode,
   comparisonResponse,
+  originalResponseForComparison,
+  isComparisonStreaming,
   onSendMessage,
   onConfirmChanges,
   onRejectChanges,
@@ -110,19 +114,51 @@ export default function Chat({
           <ScrollArea ref={scrollAreaRef} className="h-full">
             <div className="max-w-3xl mx-auto p-4">
               <div>
-                {conversation.messages.map((message, index) => renderMessage(message, index))}
+                {conversation.messages.map((message, index) => {
+                  // Hide the last assistant message when in comparison mode
+                  if (isInComparisonMode) {
+                    const lastAssistantIndex = [...conversation.messages].map((m, i) => m.role === 'assistant' ? i : -1)
+                      .filter(i => i !== -1)
+                      .pop() ?? -1
+                    if (index === lastAssistantIndex && message.role === 'assistant') {
+                      return null
+                    }
+                  }
+                  return renderMessage(message, index)
+                })}
                 {/* Show comparison mode content if active */}
-                {isInComparisonMode && comparisonResponse && (
-                  <div className="mt-6 p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-950/20">
-                    <div className="text-sm font-medium mb-2">Comparison Response:</div>
-                    <div className="whitespace-pre-wrap text-sm">{comparisonResponse}</div>
-                    <div className="flex gap-2 mt-4">
-                      <Button size="sm" onClick={onConfirmChanges}>
-                        Confirm Changes
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={onRejectChanges}>
-                        Reject Changes
-                      </Button>
+                {isInComparisonMode && (
+                  <div className="mt-6 space-y-4">
+                    <div className="text-center">
+                      <h3 className="text-lg font-medium text-foreground">Which response do you prefer?</h3>
+                      <p className="text-sm text-muted-foreground">Click on the response you'd like to keep</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Original Response Card */}
+                      <div 
+                        className="p-4 border rounded-lg bg-card hover:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={onRejectChanges}
+                      >
+                        <div className="text-sm font-medium mb-2 text-sm text-muted-foreground text-center font-mono">ORIGINAL RESPONSE</div>
+                        <div className="whitespace-pre-wrap text-base text-foreground">{originalResponseForComparison}</div>
+                      </div>
+                      
+                      {/* Steered Response Card */}
+                      <div 
+                        className={`p-4 border rounded-lg bg-card transition-colors ${
+                          isComparisonStreaming ? '' : 'hover:bg-muted/50 cursor-pointer'
+                        }`}
+                        onClick={isComparisonStreaming ? undefined : onConfirmChanges}
+                      >
+                        <div className="text-sm font-medium text-sm mb-2 text-muted-foreground text-center gap-2 text-center font-mono">STEERED RESPONSE</div>
+                        <div className="whitespace-pre-wrap text-base text-foreground">
+                          {comparisonResponse}
+                          {isComparisonStreaming && !comparisonResponse && (
+                            <span className="text-muted-foreground italic">Generating steered response...</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
