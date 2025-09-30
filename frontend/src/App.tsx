@@ -18,6 +18,7 @@ function App() {
   const [features, setFeatures] = useState<UnifiedFeature[]>([])
   const [featuresLoading, setFeaturesLoading] = useState(false)
   const [steeringLoading, setSteeringLoading] = useState(false)
+  const [isStreaming, setIsStreaming] = useState(false)
   const [selectedFeature, setSelectedFeature] = useState<UnifiedFeature | null>(null)
   const [isInComparisonMode, setIsInComparisonMode] = useState(false)
   const [comparisonResponse, setComparisonResponse] = useState<string>('')
@@ -43,9 +44,7 @@ function App() {
           isLoading: false
         })
 
-        // TODO: Remove auto-demo message when chat UI is complete
-        // Auto-send demo message to activate features for testing
-        await sendDemoMessage(newConversation.uuid)
+        console.log('Conversation created successfully:', newConversation.uuid)
       } catch (error) {
         console.error('Failed to create conversation:', error)
         setConversation(prev => ({ ...prev, isLoading: false }))
@@ -57,42 +56,6 @@ function App() {
     initializeConversation()
   }, [])
 
-  // TODO: Remove this function when chat UI is complete
-  const sendDemoMessage = async (conversationId: string) => {
-    try {
-      console.log('Sending demo message to activate features...')
-      const demoMessages = [{ role: 'user' as const, content: 'Hello, how are you today? Answer in one sentence.' }]
-      
-      // Send message to backend (we don't need to handle the streaming response for demo)
-      const stream = await conversationApi.sendMessage(conversationId, demoMessages)
-      
-      // Consume the stream to complete the request
-      const reader = stream.getReader()
-      let fullResponse = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const chunk = new TextDecoder().decode(value)
-        fullResponse += chunk
-      }
-      
-      // Update conversation with demo messages
-      setConversation(prev => ({
-        ...prev,
-        messages: [
-          ...demoMessages,
-          { role: 'assistant', content: fullResponse }
-        ]
-      }))
-      
-      console.log('Demo message completed, features should now be available')
-      
-      // Load features after demo message
-      await loadFeatures(conversationId)
-    } catch (error) {
-      console.error('Failed to send demo message:', error)
-    }
-  }
 
   // Load features for the conversation
   const loadFeatures = async (conversationId: string) => {
@@ -114,10 +77,67 @@ function App() {
     }
   }
 
-  // Event handlers (skeleton implementations)
+  // Event handlers
   const handleSendMessage = async (content: string) => {
-    console.log('Send message:', content)
-    // TODO: Implement message sending
+    if (!conversation.id) {
+      throw new Error('No active conversation')
+    }
+
+    try {
+      setIsStreaming(true)
+      
+      // Add user message to conversation immediately
+      const userMessage = { role: 'user' as const, content }
+      setConversation(prev => ({
+        ...prev,
+        messages: [...prev.messages, userMessage]
+      }))
+
+      // Prepare messages for API (include conversation history)
+      const messages = [...conversation.messages, userMessage]
+      
+      // Send message to backend and handle streaming response
+      const stream = await conversationApi.sendMessage(conversation.id, messages)
+      const reader = stream.getReader()
+      
+      // Add empty assistant message that we'll update as chunks arrive
+      let assistantMessage = { role: 'assistant' as const, content: '' }
+      setConversation(prev => ({
+        ...prev,
+        messages: [...prev.messages, assistantMessage]
+      }))
+
+      // Read streaming response
+      let fullResponse = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        const chunk = new TextDecoder().decode(value)
+        fullResponse += chunk
+        
+        // Update the assistant message in real-time
+        setConversation(prev => ({
+          ...prev,
+          messages: prev.messages.map((msg, index) => 
+            index === prev.messages.length - 1 && msg.role === 'assistant'
+              ? { ...msg, content: fullResponse }
+              : msg
+          )
+        }))
+      }
+
+      setIsStreaming(false)
+      console.log('Message completed, loading features...')
+      
+      // Load features after message completion (features activate after messages)
+      // This runs in background - user can send another message while this loads
+      await loadFeatures(conversation.id)
+    } catch (error) {
+      console.error('Failed to send message:', error)
+      setIsStreaming(false)
+      throw error // Re-throw to let Chat component handle the error display
+    }
   }
 
   const handleFeatureSelect = (feature: UnifiedFeature) => {
@@ -201,6 +221,8 @@ function App() {
             onSendMessage={handleSendMessage}
             onConfirmChanges={handleConfirmChanges}
             onRejectChanges={handleRejectChanges}
+            isStreaming={isStreaming}
+            featuresLoading={featuresLoading}
           />
         </div>
 

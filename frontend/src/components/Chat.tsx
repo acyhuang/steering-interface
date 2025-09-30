@@ -1,4 +1,9 @@
-import type { ConversationState } from '@/types'
+import { useState, useEffect, useRef } from 'react'
+import { ArrowUp } from 'lucide-react'
+import type { ConversationState, ChatMessage } from '@/types'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Textarea } from '@/components/ui/textarea'
+import { Button } from '@/components/ui/button'
 
 interface ChatProps {
   conversation: ConversationState
@@ -7,6 +12,8 @@ interface ChatProps {
   onSendMessage: (content: string) => Promise<void>
   onConfirmChanges: () => Promise<void>
   onRejectChanges: () => Promise<void>
+  isStreaming: boolean
+  featuresLoading: boolean
 }
 
 export default function Chat({
@@ -15,17 +22,147 @@ export default function Chat({
   comparisonResponse,
   onSendMessage,
   onConfirmChanges,
-  onRejectChanges
+  onRejectChanges,
+  isStreaming,
+  featuresLoading
 }: ChatProps) {
+  const [inputMessage, setInputMessage] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight
+      }
+    }
+  }, [conversation.messages])
+
+  const handleSendMessage = async () => {
+    const trimmedMessage = inputMessage.trim()
+    if (!trimmedMessage || isStreaming) return
+
+    try {
+      setError(null)
+      setInputMessage('')
+      
+      await onSendMessage(trimmedMessage)
+    } catch (error) {
+      console.error('Failed to send message:', error)
+      setError('Failed to send message. Please try again.')
+      // Restore the message in input on error
+      setInputMessage(trimmedMessage)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
+
+  const renderMessage = (message: ChatMessage, index: number) => {
+    const isUser = message.role === 'user'
+    
+    return (
+      <div
+        key={index}
+        className={`my-4 flex ${isUser ? 'justify-end' : 'justify-start'}`}
+      >
+        <div
+          className={`max-w-[90%] rounded-lg ${
+            isUser
+              ? 'bg-secondary text-foreground px-3 py-2'
+              : 'text-foreground'
+          }`}
+        >
+          <div className="whitespace-pre-wrap">{message.content}</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="h-full p-4 bg-background">
-      <div className="text-lg font-medium">Chat Component</div>
-      <div className="mt-2 text-sm text-muted-foreground">
-        <p>Conversation ID: {conversation.id || 'Loading...'}</p>
-        {/* <p>Variant ID: {conversation.currentVariant.label || 'Loading...'}</p> */}
-        <p>Messages: {conversation.messages.length}</p>
-        <p>Comparison Mode: {isInComparisonMode ? 'Yes' : 'No'}</p>
-        <p>Current Variant: {conversation.currentVariant?.label || 'None'}</p>
+    <div className="h-full flex flex-col relative">
+      {/* Debug Overlay */}
+      <div className="absolute top-2 right-2 z-10 bg-background/50 backdrop-blur-sm border rounded-lg p-2 text-xs text-muted-foreground shadow-sm">
+        <div className="space-y-1">
+          <div><strong>Conversation:</strong> {conversation.id || 'Loading...'}</div>
+          <div><strong>Variant:</strong> {conversation.currentVariant?.label || 'None'}</div>
+          <div><strong>Messages:</strong> {conversation.messages.length}</div>
+          <div><strong>Streaming:</strong> {isStreaming ? 'Yes' : 'No'}</div>
+          <div><strong>Features:</strong> {featuresLoading ? 'Loading...' : 'Ready'}</div>
+          <div><strong>Comparison:</strong> {isInComparisonMode ? 'Active' : 'Off'}</div>
+        </div>
+      </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-hidden">
+        {conversation.messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground bg-muted text-center">
+            <p className="text-sm">Start a conversation</p>
+          </div>
+        ) : (
+          <ScrollArea ref={scrollAreaRef} className="h-full">
+            <div className="max-w-3xl mx-auto p-4">
+              <div>
+                {conversation.messages.map((message, index) => renderMessage(message, index))}
+                {/* Show comparison mode content if active */}
+                {isInComparisonMode && comparisonResponse && (
+                  <div className="mt-6 p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-950/20">
+                    <div className="text-sm font-medium mb-2">Comparison Response:</div>
+                    <div className="whitespace-pre-wrap text-sm">{comparisonResponse}</div>
+                    <div className="flex gap-2 mt-4">
+                      <Button size="sm" onClick={onConfirmChanges}>
+                        Confirm Changes
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={onRejectChanges}>
+                        Reject Changes
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </ScrollArea>
+        )}
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm">
+          {error}
+        </div>
+      )}
+
+      {/* Input Area */}
+      <div className="border-t border-border px-4 py-3">
+        <div className="flex gap-2 items-end max-w-3xl mx-auto">
+          <div className="flex-1">
+            <Textarea
+              ref={textareaRef}
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type your message..."
+              disabled={isStreaming}
+              className="min-h-[40px] max-h-32 resize-none"
+              rows={1}
+            />
+          </div>
+          <Button
+            onClick={handleSendMessage}
+            disabled={!inputMessage.trim() || isStreaming}
+            size="icon"
+            className="rounded-full h-10 w-10 shrink-0"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   )

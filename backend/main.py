@@ -7,7 +7,7 @@ from backend.core.config import settings
 from backend.routers.conversation import router as conversation_router
 from backend.routers.variant import router as variant_router
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
