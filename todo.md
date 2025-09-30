@@ -9,6 +9,5 @@
 - custom slider that shows increase vs decrease
 - if user sends message while loading features, abort and start new process instead of queueing
 - render markdown
-- dark mode
 - frontend debug mode
 - comparison view wider

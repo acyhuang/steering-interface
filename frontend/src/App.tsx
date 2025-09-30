@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Sidebar } from 'lucide-react'
+import { Sidebar, Moon, Sun } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { conversationApi, variantApi } from '@/services/api'
 import type { ConversationState, UnifiedFeature } from '@/types'
@@ -25,9 +25,34 @@ function App() {
   const [isComparisonStreaming, setIsComparisonStreaming] = useState(false)
   const [originalResponseForComparison, setOriginalResponseForComparison] = useState<string>('')
   const [isControlsVisible, setIsControlsVisible] = useState(true)
+  const [isDarkMode, setIsDarkMode] = useState(false)
 
   // Prevent duplicate initialization in React StrictMode
   const hasInitialized = useRef(false)
+
+  // Initialize dark mode on app load
+  useEffect(() => {
+    // Check localStorage for saved preference
+    const savedDarkMode = localStorage.getItem('darkMode')
+    let shouldUseDarkMode = false
+    
+    if (savedDarkMode !== null) {
+      // Use saved preference
+      shouldUseDarkMode = savedDarkMode === 'true'
+    } else {
+      // Fall back to system preference
+      shouldUseDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+    }
+    
+    setIsDarkMode(shouldUseDarkMode)
+    
+    // Apply dark class if needed
+    if (shouldUseDarkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [])
 
   // Create conversation on app load
   useEffect(() => {
@@ -324,19 +349,44 @@ function App() {
     setIsControlsVisible(!isControlsVisible)
   }
 
+  const toggleDarkMode = () => {
+    const newDarkMode = !isDarkMode
+    setIsDarkMode(newDarkMode)
+    
+    // Apply/remove dark class to document root
+    if (newDarkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+    
+    // Save preference to localStorage
+    localStorage.setItem('darkMode', newDarkMode.toString())
+  }
+
   return (
     <div className="h-screen flex flex-col">
       {/* Navigation Bar */}
       <nav className="bg-background border-b border-border px-4 py-3 flex justify-between items-center">
         <span className="text-xl font-medium">steering-interface</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={toggleControls}
-          className="p-2"
-        >
-          <Sidebar className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleDarkMode}
+            className="p-2"
+          >
+            {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleControls}
+            className="p-2"
+          >
+            <Sidebar className="h-4 w-4" />
+          </Button>
+        </div>
       </nav>
 
       {/* Main Content Area */}
