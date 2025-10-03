@@ -113,7 +113,7 @@ export default function Chat({
       <div className="flex-1 overflow-hidden">
         {conversation.messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-muted-foreground bg-muted text-center">
-            <p className="text-sm">Start a conversation</p>
+            <p className="text-base">Start a conversation</p>
           </div>
         ) : (
           <ScrollArea ref={scrollAreaRef} className="h-full">

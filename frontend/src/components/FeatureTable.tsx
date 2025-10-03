@@ -31,46 +31,44 @@ export default function FeatureTable({
 
   if (features.length === 0) {
     return (
-      <div className="h-full p-4">
+      <div className="h-full p-4 text-center text-muted-foreground justify-center">
         <div>No features available</div>
       </div>
     )
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-4 border-b">
-        <div className="text-lg font-medium">Features ({features.length})</div>
-      </div>
-      
-      <div className="flex-1 overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Label</TableHead>
-              <TableHead>Activation</TableHead>
-              <TableHead>Modification</TableHead>
+    <div className="h-full overflow-auto">
+      <Table className="table-fixed w-full">
+        <TableHeader className="sticky top-0 z-10 bg-muted border-b border-border">
+          <TableRow className="text-xs hover:bg-transparent">
+            <TableHead className="w-auto">Label</TableHead>
+            <TableHead className="w-24 text-right">Activation</TableHead>
+            <TableHead className="w-24 text-right">Modification</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {features.map((feature) => (
+            <TableRow
+              key={feature.uuid}
+              className={`cursor-pointer hover:bg-muted/50 text-sm text-muted-foreground ${
+                selectedFeature?.uuid === feature.uuid ? 'bg-muted' : ''
+              }`}
+              onClick={() => onFeatureSelect(feature)}
+            >
+              <TableCell className="truncate max-w-0" title={feature.label}>
+                {feature.label}
+              </TableCell>
+              <TableCell className="font-mono text-right w-20">
+                {feature.activation !== null ? feature.activation.toFixed(1) : '-'}
+              </TableCell>
+              <TableCell className={`font-mono text-right w-20${feature.modification !== 0 ? " font-medium text-foreground" : ""}`}>
+                {feature.modification.toFixed(1)}
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {features.map((feature) => (
-              <TableRow
-                key={feature.uuid}
-                className={`cursor-pointer hover:bg-muted/50 text-xs text-muted-foreground ${
-                  selectedFeature?.uuid === feature.uuid ? 'bg-muted' : ''
-                }`}
-                onClick={() => onFeatureSelect(feature)}
-              >
-                <TableCell className="">{feature.label}</TableCell>
-                <TableCell>{feature.activation !== null ? feature.activation.toFixed(1) : '-'}</TableCell>
-                <TableCell className={feature.modification !== 0 ? "font-medium text-foreground" : undefined}>
-                  {feature.modification.toFixed(1)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   )
 }

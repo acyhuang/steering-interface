@@ -1,6 +1,7 @@
-import type { UnifiedFeature } from '@/types'
+import type { UnifiedFeature, FilterOption, SortOption, SortOrder } from '@/types'
 import FeatureTable from './FeatureTable'
 import FeatureEditor from './FeatureEditor'
+import FeatureTableHeader from './FeatureTableHeader'
 
 interface ControlsProps {
   features: UnifiedFeature[]
@@ -9,6 +10,12 @@ interface ControlsProps {
   onSteer: (featureUuid: string, value: number) => Promise<void>
   isLoading: boolean
   isDeveloperMode: boolean
+  filterBy: FilterOption
+  sortBy: SortOption
+  sortOrder: SortOrder
+  onFilterChange: (filter: FilterOption) => void
+  onSortChange: (sort: SortOption) => void
+  onSortOrderChange: (order: SortOrder) => void
 }
 
 export default function Controls({
@@ -17,7 +24,13 @@ export default function Controls({
   onFeatureSelect,
   onSteer,
   isLoading,
-  isDeveloperMode
+  isDeveloperMode,
+  filterBy,
+  sortBy,
+  sortOrder,
+  onFilterChange,
+  onSortChange,
+  onSortOrderChange
 }: ControlsProps) {
   return (
     <div className="h-full flex flex-col bg-background relative">
@@ -40,28 +53,42 @@ export default function Controls({
         </div>
       )}
       
-      <div className="p-4 border-b border-border">
-        <div className="text-lg font-medium">Controls</div>
+      <div className="p-3 border-b border-border">
+        <div className="text-base font-mono uppercase font-medium">Controls</div>
       </div>
       
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Feature Table */}
-        <div className="flex-1 overflow-hidden">
-          <FeatureTable
-            features={features}
-            selectedFeature={selectedFeature}
-            onFeatureSelect={onFeatureSelect}
-            isLoading={isLoading}
-          />
-        </div>
-        
-        {/* Feature Editor */}
-        <div className="border-t border-border">
-          <FeatureEditor
-            feature={selectedFeature}
-            onSteer={onSteer}
-            isLoading={isLoading}
-          />
+      <div className="flex-1 flex flex-col overflow-hidden p-2">
+        {/* Unified Table Container */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Feature Table Header */}
+          <div className="pb-2">
+            <FeatureTableHeader
+              filterBy={filterBy}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onFilterChange={onFilterChange}
+              onSortChange={onSortChange}
+              onSortOrderChange={onSortOrderChange}
+            />
+          </div>
+          
+          {/* Feature Table */}
+          <div className="flex-1 overflow-auto rounded-md border border-border">
+            <FeatureTable
+              features={features}
+              selectedFeature={selectedFeature}
+              onFeatureSelect={onFeatureSelect}
+              isLoading={isLoading}
+            />
+          </div>
+          {/* Feature Editor */}
+          <div className="border border-border rounded-md mt-2">
+            <FeatureEditor
+              feature={selectedFeature}
+              onSteer={onSteer}
+              isLoading={isLoading}
+            />
+          </div>
         </div>
       </div>
     </div>

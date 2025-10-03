@@ -28,7 +28,7 @@ export default function FeatureEditor({
 
   if (!feature) {
     return (
-      <div className="p-4">
+      <div className="text-base text-center text-muted-foreground p-4">
         <div>No feature selected</div>
       </div>
     )
@@ -42,13 +42,13 @@ export default function FeatureEditor({
   }
 
   return (
-    <div className="p-4 space-y-2">
+    <div className="p-3 space-y-2">
       <div className="text-base font-medium">{feature.label}</div>
-      <div className="space-y-2 text-sm flex gap-4 text-muted-foreground">
+      {/* <div className="space-y-2 text-sm flex gap-4 text-muted-foreground">
         <p>Activation: {feature.activation !== null ? feature.activation.toFixed(1) : '-'}</p>
         <p>Current Modification: {feature.modification.toFixed(1)}</p>
         <p>Pending: {feature.pending_modification !== null ? feature.pending_modification.toFixed(1) : '-'}</p>
-      </div>
+      </div> */}
 
       <div className="space-y-3">
         <div>
@@ -75,6 +75,7 @@ export default function FeatureEditor({
         <Button 
           onClick={handleSteer} 
           disabled={isLoading}
+          variant="default"
           className="w-full"
         >
           {isLoading ? 'Steering...' : 'Steer Feature'}

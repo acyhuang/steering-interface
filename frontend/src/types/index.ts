@@ -37,3 +37,14 @@ export interface FeatureState {
   error: string | null;
 }
 
+// Filter and Sort Types
+export type FilterOption = 'all' | 'activated' | 'modified'
+export type SortOption = 'label' | 'activation' | 'modification'
+export type SortOrder = 'asc' | 'desc'
+
+export interface FilterSortState {
+  filterBy: FilterOption
+  sortBy: SortOption
+  sortOrder: SortOrder
+}
+

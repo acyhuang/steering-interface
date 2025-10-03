@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { PanelRight, Moon, Sun, Code } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { conversationApi, variantApi } from '@/services/api'
-import type { ConversationState, UnifiedFeature } from '@/types'
+import type { ConversationState, UnifiedFeature, FilterOption, SortOption, SortOrder } from '@/types'
 import Chat from './components/Chat'
 import Controls from './components/Controls'
 
@@ -27,6 +27,11 @@ function App() {
   const [isControlsVisible, setIsControlsVisible] = useState(true)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [isDeveloperMode, setIsDeveloperMode] = useState(false)
+  
+  // Filter and sort state
+  const [filterBy, setFilterBy] = useState<FilterOption>('all')
+  const [sortBy, setSortBy] = useState<SortOption>('activation')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
 
   // Prevent duplicate initialization in React StrictMode
   const hasInitialized = useRef(false)
@@ -369,6 +374,53 @@ function App() {
     setIsDeveloperMode(!isDeveloperMode)
   }
 
+  // Filter and sort logic
+  const getFilteredFeatures = (features: UnifiedFeature[], filterBy: FilterOption): UnifiedFeature[] => {
+    switch (filterBy) {
+      case 'activated':
+        return features.filter(f => f.activation !== null && f.activation > 0)
+      case 'modified':
+        return features.filter(f => f.modification !== 0)
+      case 'all':
+      default:
+        return features
+    }
+  }
+
+  const getSortedFeatures = (features: UnifiedFeature[], sortBy: SortOption, sortOrder: SortOrder): UnifiedFeature[] => {
+    return [...features].sort((a, b) => {
+      let aValue: string | number
+      let bValue: string | number
+      
+      switch (sortBy) {
+        case 'label':
+          aValue = a.label.toLowerCase()
+          bValue = b.label.toLowerCase()
+          break
+        case 'activation':
+          aValue = a.activation ?? 0
+          bValue = b.activation ?? 0
+          break
+        case 'modification':
+          aValue = a.modification
+          bValue = b.modification
+          break
+        default:
+          return 0
+      }
+      
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1
+      return 0
+    })
+  }
+
+  // Process features with filtering and sorting
+  const processedFeatures = useMemo(() => {
+    const filtered = getFilteredFeatures(features, filterBy)
+    return getSortedFeatures(filtered, sortBy, sortOrder)
+  }, [features, filterBy, sortBy, sortOrder])
+
   return (
     <div className="h-screen flex flex-col">
       {/* Navigation Bar */}
@@ -427,12 +479,18 @@ function App() {
         {isControlsVisible && (
           <div className="w-2/5 border-l border-border">
             <Controls
-              features={features}
+              features={processedFeatures}
               selectedFeature={selectedFeature}
               onFeatureSelect={handleFeatureSelect}
               onSteer={handleSteer}
               isLoading={featuresLoading || steeringLoading}
               isDeveloperMode={isDeveloperMode}
+              filterBy={filterBy}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onFilterChange={setFilterBy}
+              onSortChange={setSortBy}
+              onSortOrderChange={setSortOrder}
             />
           </div>
         )}
