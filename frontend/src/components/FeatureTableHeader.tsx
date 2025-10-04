@@ -1,12 +1,5 @@
 import type { FilterOption, SortOption, SortOrder } from '@/types'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Tabs,
   TabsList,
   TabsTrigger,
@@ -23,56 +16,31 @@ interface FeatureTableHeaderProps {
 
 export default function FeatureTableHeader({
   filterBy,
-  sortBy,
-  sortOrder,
+  sortBy: _sortBy,
+  sortOrder: _sortOrder,
   onFilterChange,
-  onSortChange,
-  onSortOrderChange,
+  onSortChange: _onSortChange,
+  onSortOrderChange: _onSortOrderChange,
 }: FeatureTableHeaderProps) {
 
-  // Helper function to handle combined sort selection
-  const handleSortChange = (value: string) => {
-    switch (value) {
-      case 'label-asc':
-        onSortChange('label')
-        onSortOrderChange('asc')
-        break
-      case 'label-desc':
-        onSortChange('label')
-        onSortOrderChange('desc')
-        break
-      case 'activation-desc':
-        onSortChange('activation')
-        onSortOrderChange('desc')
-        break
-      case 'activation-asc':
-        onSortChange('activation')
-        onSortOrderChange('asc')
-        break
-      case 'modification-desc':
-        onSortChange('modification')
-        onSortOrderChange('desc')
-        break
-      case 'modification-asc':
-        onSortChange('modification')
-        onSortOrderChange('asc')
-        break
-    }
-  }
-
-  // Helper function to get current combined sort value
-  const getCurrentSortValue = () => {
-    return `${sortBy}-${sortOrder}`
-  }
 
   return (
     <div className="flex items-center gap-4">
       {/* Filter Tabs */}
       <Tabs value={filterBy} onValueChange={(value) => onFilterChange(value as FilterOption)} className="w-auto">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="activated">Activated</TabsTrigger>
-          <TabsTrigger value="modified">Modified</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger 
+            value="activated"
+            title="Features influencing the current conversation."
+          >
+            Activated
+          </TabsTrigger>
+          <TabsTrigger 
+            value="modified"
+            title="Features that are being strengthened or suppressed."
+          >
+            Modified
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 

@@ -29,7 +29,7 @@ function App() {
   const [isDeveloperMode, setIsDeveloperMode] = useState(false)
   
   // Filter and sort state
-  const [filterBy, setFilterBy] = useState<FilterOption>('all')
+  const [filterBy, setFilterBy] = useState<FilterOption>('activated')
   const [sortBy, setSortBy] = useState<SortOption>('activation')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
 
