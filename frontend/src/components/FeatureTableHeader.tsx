@@ -4,6 +4,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Search } from "lucide-react"
 
 interface FeatureTableHeaderProps {
   filterBy: FilterOption
@@ -12,6 +14,8 @@ interface FeatureTableHeaderProps {
   onFilterChange: (filter: FilterOption) => void
   onSortChange: (sort: SortOption) => void
   onSortOrderChange: (order: SortOrder) => void
+  onSearchClick: () => void
+  isSearching: boolean
 }
 
 export default function FeatureTableHeader({
@@ -21,11 +25,13 @@ export default function FeatureTableHeader({
   onFilterChange,
   onSortChange: _onSortChange,
   onSortOrderChange: _onSortOrderChange,
+  onSearchClick,
+  isSearching,
 }: FeatureTableHeaderProps) {
 
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center justify-between">
       {/* Filter Tabs */}
       <Tabs value={filterBy} onValueChange={(value) => onFilterChange(value as FilterOption)} className="w-auto">
         <TabsList className="grid w-full grid-cols-2">
@@ -43,6 +49,16 @@ export default function FeatureTableHeader({
           </TabsTrigger>
         </TabsList>
       </Tabs>
+
+      {/* Search Button */}
+      <Button
+        onClick={onSearchClick}
+        variant="ghost"
+        size="sm"
+        disabled={isSearching}
+      >
+        <Search className="h-4 w-4" />
+      </Button>
 
       {/* Combined Sort Select */}
       {/* <Select value={getCurrentSortValue()} onValueChange={handleSortChange}>

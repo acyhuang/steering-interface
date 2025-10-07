@@ -48,3 +48,11 @@ export interface FilterSortState {
   sortOrder: SortOrder
 }
 
+// Search Types
+export interface SearchState {
+  isSearching: boolean
+  query: string
+  results: UnifiedFeature[]
+  isLoading: boolean
+}
+

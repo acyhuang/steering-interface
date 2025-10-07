@@ -87,5 +87,19 @@ export const variantApi = {
     const response = await apiClient.post(`/variants/${variantId}/reject-changes`);
     return response.data;
   },
+
+  searchFeatures: async (
+    variantId: string,
+    query: string,
+    topK: number = 10
+  ): Promise<UnifiedFeature[]> => {
+    const response = await apiClient.get(`/variants/${variantId}/features/search`, {
+      params: {
+        query,
+        top_k: topK
+      }
+    });
+    return response.data.features;
+  },
 };
 

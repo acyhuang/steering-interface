@@ -491,6 +491,7 @@ function App() {
               onFilterChange={setFilterBy}
               onSortChange={setSortBy}
               onSortOrderChange={setSortOrder}
+              currentVariantId={conversation.currentVariant?.uuid || null}
             />
           </div>
         )}
