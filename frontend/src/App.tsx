@@ -421,6 +421,11 @@ function App() {
     return getSortedFeatures(filtered, sortBy, sortOrder)
   }, [features, filterBy, sortBy, sortOrder])
 
+  // Compute pending features for comparison mode
+  const pendingFeatures = useMemo(() => {
+    return features.filter(f => f.pending_modification !== null)
+  }, [features])
+
   return (
     <div className="h-screen flex flex-col">
       {/* Navigation Bar */}
@@ -472,6 +477,7 @@ function App() {
             isStreaming={isStreaming}
             featuresLoading={featuresLoading}
             isDeveloperMode={isDeveloperMode}
+            pendingFeatures={pendingFeatures}
           />
         </div>
 

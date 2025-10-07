@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { ArrowUp } from 'lucide-react'
-import type { ConversationState, ChatMessage } from '@/types'
+import type { ConversationState, ChatMessage, UnifiedFeature } from '@/types'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import MessageContent from './MessageContent'
 
 interface ChatProps {
@@ -18,6 +19,7 @@ interface ChatProps {
   isStreaming: boolean
   featuresLoading: boolean
   isDeveloperMode: boolean
+  pendingFeatures: UnifiedFeature[]
 }
 
 export default function Chat({
@@ -31,7 +33,8 @@ export default function Chat({
   onRejectChanges,
   isStreaming,
   featuresLoading,
-  isDeveloperMode
+  isDeveloperMode,
+  pendingFeatures
 }: ChatProps) {
   const [inputMessage, setInputMessage] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -166,6 +169,24 @@ export default function Chat({
                             <span className="text-muted-foreground italic">Generating steered response...</span>
                           ) : null}
                         </div>
+                        
+                        {/* Pending Features Badges */}
+                        {pendingFeatures.length > 0 && (
+                          <div className="mt-2 pt-2">
+                            <div className="text-xs text-muted-foreground mb-2 font-medium">Pending Changes:</div>
+                            <div className="flex flex-wrap gap-1">
+                              {pendingFeatures.map((feature) => (
+                                <Badge
+                                  key={feature.uuid}
+                                  variant="secondary"
+                                  className="text-xs"
+                                >
+                                  {feature.label}: {feature.pending_modification !== null ? feature.pending_modification.toFixed(1) : '0.0'}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
