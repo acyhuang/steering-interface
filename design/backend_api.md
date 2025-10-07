@@ -60,8 +60,10 @@ POST/variants (create)
 <!-- TODO: POST /conversations/{id}/switch-variant (switch variant) -->
 
 POST /variants/{id}/features/{uuid}/steer (steer feature)
+GET /variants/{id}/features/search?query={query}&top_k={top_k} (search features)
 POST /variants/{id}/commit-changes (confirm pending)
 POST /variants/{id}/reject-changes (reject pending)
+POST /variants/{id}/auto-steer (auto steer)
 <!-- TODO: DELETE /variants/{id}/modifications (clear modifications) -->
 
 ## TODO for v2.1

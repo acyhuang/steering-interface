@@ -2,7 +2,6 @@
 - variant and conversation storage / management
 
 # medium
-- search endpoint
 - auto-steer endpoint
 
 # small
@@ -10,3 +9,5 @@
 - if user sends message while loading features, abort and start new process instead of queueing
 - comparison view wider
 - change error view to toast
+- tooltip on activation / modification
+- show activation values in search results

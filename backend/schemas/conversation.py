@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from .variant import VariantSummary
-from .feature import Feature
+from .feature import UnifiedFeature
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
@@ -26,7 +26,7 @@ class ConversationResponse(BaseModel):
     """
     uuid: str
     current_variant: VariantSummary
-    features: List[Feature]
+    features: List[UnifiedFeature]
 
 class ConversationMessageRequest(BaseModel):
     """Request to send a message in the conversation"""

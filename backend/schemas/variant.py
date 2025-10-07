@@ -1,5 +1,6 @@
 from typing import List, Dict, Optional
 from pydantic import BaseModel
+from .feature import UnifiedFeature
 
 class VariantSummary(BaseModel):
     uuid: str
@@ -30,3 +31,20 @@ class VariantSwitchResponse(VariantResponse):
 class VariantOperationResponse(BaseModel):
     """Simple success response for variant operations like commit/reject/clear"""
     success: bool
+
+class FeatureSearchRequest(BaseModel):
+    query: str
+    top_k: int
+
+class FeatureSearchResponse(BaseModel):
+    features: List[UnifiedFeature]
+
+class AutoSteerRequest(BaseModel):
+    query: str
+    current_variant_id: str
+    conversation_context: Optional[List[str]]
+
+class AutoSteerResponse(BaseModel):
+    success: bool
+    search_keywords: List[str] # Keywords used to search for features
+    suggested_features: List[UnifiedFeature]

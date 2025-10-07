@@ -22,7 +22,7 @@ class ConversationService:
     
     # v2.0: In-memory storage for conversation data
     _conversation_messages: Dict[str, List[ChatMessage]] = {}
-    _conversation_activated_features: Dict[str, Dict[str, str]] = {}  # {conv_id: {feature_uuid: label}}
+    _conversation_activated_features: Dict[str, Dict[str, UnifiedFeature]] = {}  # {conv_id: {feature_uuid: UnifiedFeature}}
     
     def create_conversation(
         self, 
@@ -270,7 +270,7 @@ class ConversationService:
                 if conversation_id not in self._conversation_activated_features:
                     self._conversation_activated_features[conversation_id] = {}
                 
-                self._conversation_activated_features[conversation_id][str(activation.feature.uuid)] = activation.feature.label
+                self._conversation_activated_features[conversation_id][str(activation.feature.uuid)] = unified_feature
                 
             except Exception as e:
                 logger.error(f"Error processing feature {activation.feature.uuid}: {str(e)}")
@@ -279,6 +279,20 @@ class ConversationService:
         
         logger.info(f"Successfully processed {len(unified_features)} features for conversation {conversation_id}")
         return unified_features
+    
+    def get_activated_features(self, conversation_id: str) -> Dict[str, float]:
+        """
+        Get the activated features for a conversation as a dict of activation values.
+        
+        Args:
+            conversation_id: UUID of the conversation
+            
+        Returns:
+            Dict mapping feature UUIDs to activation values
+        """
+        activated = self._conversation_activated_features.get(conversation_id, {})
+        # Extract just the activation values from UnifiedFeature objects
+        return {uuid: feature.activation for uuid, feature in activated.items() if feature.activation is not None}
     
     async def get_table_features(
         self,

@@ -4,8 +4,9 @@ from goodfire import AsyncClient
 import goodfire
 
 from ..core.constants import DEMO_VARIANT_ID, DEMO_VARIANT_LABEL, DEFAULT_BASE_MODEL
-from ..schemas.variant import VariantSummary, VariantCreateRequest, VariantResponse, VariantOperationResponse
+from ..schemas.variant import VariantSummary, VariantCreateRequest, VariantResponse, VariantOperationResponse, FeatureSearchRequest, FeatureSearchResponse, AutoSteerRequest, AutoSteerResponse
 from ..schemas.feature import VariantSteerRequest, VariantSteerResponse, UnifiedFeature
+from .llm_service import LLMService
 
 logger = logging.getLogger(__name__)
 
@@ -296,3 +297,227 @@ class VariantService:
             modification=modification,
             pending_modification=pending_modification
         )
+    
+    async def search_features(
+        self,
+        variant_id: str,
+        request: FeatureSearchRequest,
+        ember_client: AsyncClient,
+        activated_features: Optional[Dict[str, float]] = None
+    ) -> FeatureSearchResponse:
+        """
+        Search for features using semantic similarity.
+        
+        Args:
+            variant_id: UUID of the variant to search within
+            request: Search request with query and top_k parameters
+            ember_client: Ember SDK client for feature operations
+            activated_features: Optional dict mapping feature UUIDs to activation values
+                               from a conversation context
+            
+        Returns:
+            FeatureSearchResponse with matching features
+            
+        Raises:
+            ValueError: If variant doesn't exist
+        """
+        logger.info(f"Searching features for variant {variant_id} with query: '{request.query}', top_k: {request.top_k}")
+        
+        # v2.0: Validate variant exists (hardcoded demo check)
+        if variant_id != DEMO_VARIANT_ID:
+            raise ValueError(f"Variant {variant_id} not found")
+        
+        # Validate search parameters
+        if not request.query.strip():
+            raise ValueError("Search query cannot be empty")
+        
+        if request.top_k <= 0:
+            raise ValueError("top_k must be greater than 0")
+        
+        if request.top_k > 100:  
+            raise ValueError("top_k cannot exceed 100")
+        
+        try:
+            # Create base variant for search (using default model)
+            variant = goodfire.Variant(DEFAULT_BASE_MODEL)
+            
+            # Perform semantic search using Ember SDK
+            logger.debug(f"Performing semantic search with query: '{request.query}'")
+            search_results = await ember_client.features.search(
+                query=request.query,
+                model=variant,
+                top_k=request.top_k
+            )
+            
+            # Transform results to UnifiedFeature objects with modification data
+            features = []
+            for result in search_results:
+                feature_uuid = str(result.uuid)
+                
+                # Check if this feature has an activation value from conversation context
+                activation = None
+                if activated_features and feature_uuid in activated_features:
+                    activation = activated_features[feature_uuid]
+                
+                unified_feature = self.create_unified_feature(
+                    feature_uuid=feature_uuid,
+                    label=result.label,
+                    activation=activation,
+                    variant_id=variant_id
+                )
+                features.append(unified_feature)
+            
+            logger.info(f"Found {len(features)} matching features for query: '{request.query}'")
+            return FeatureSearchResponse(features=features)
+            
+        except Exception as e:
+            logger.error(f"Error searching features: {str(e)}")
+            raise ValueError(f"Failed to search features: {str(e)}")
+    
+    async def auto_steer(
+        self,
+        request: AutoSteerRequest,
+        ember_client: AsyncClient
+    ) -> AutoSteerResponse:
+        """
+        Automatically steer features based on user query using LLM analysis.
+        
+        Args:
+            request: AutoSteerRequest with query, variant_id, and conversation context
+            ember_client: Ember SDK client for feature operations
+            
+        Returns:
+            AutoSteerResponse with suggested features and modifications
+            
+        Raises:
+            ValueError: If variant doesn't exist or other validation errors
+            Exception: If LLM operations fail
+        """
+        logger.info(f"Auto-steering for variant {request.current_variant_id} with query: '{request.query}'")
+        
+        # v2.0: Validate variant exists (hardcoded demo check)
+        if request.current_variant_id != DEMO_VARIANT_ID:
+            raise ValueError(f"Variant {request.current_variant_id} not found")
+        
+        try:
+            # Initialize LLM service
+            llm_service = LLMService()
+            
+            # Get current modifications for context
+            current_modifications = self._variant_modified_features.get(request.current_variant_id, {})
+            pending_modifications = self._variant_pending_features.get(request.current_variant_id, {})
+            
+            # Build current modifications info for LLM (feature labels + values)
+            # For now, we'll use a simplified approach since we don't have feature labels readily available
+            # In a real implementation, you'd want to fetch feature details from Ember SDK
+            current_mods_info = {}
+            if current_modifications:
+                # This is a simplified version - in practice you'd want to get actual feature labels
+                for feature_uuid, value in current_modifications.items():
+                    current_mods_info[f"Feature {feature_uuid}"] = value
+            
+            # Step 1: Generate search keywords using LLM
+            logger.debug("Generating search keywords with LLM")
+            keywords = await llm_service.generate_search_keywords(
+                user_query=request.query,
+                conversation_context=request.conversation_context,
+                current_modifications=current_mods_info
+            )
+            
+            if not keywords:
+                logger.warning("No keywords generated by LLM")
+                return AutoSteerResponse(
+                    success=False,
+                    search_keywords=[],
+                    suggested_features=[]
+                )
+            
+            # Step 2: Combine keywords into single search query
+            combined_query = " ".join(keywords)
+            logger.debug(f"Searching features with combined query: '{combined_query}'")
+            
+            # Step 3: Search for features using existing search method
+            search_request = FeatureSearchRequest(query=combined_query, top_k=10)
+            search_response = await self.search_features(
+                variant_id=request.current_variant_id,
+                request=search_request,
+                ember_client=ember_client
+            )
+            
+            if not search_response.features:
+                logger.warning("No features found in search")
+                return AutoSteerResponse(
+                    success=False,
+                    search_keywords=keywords,
+                    suggested_features=[]
+                )
+            
+            # Step 4: Use LLM to select features to modify
+            logger.debug("Selecting features to modify with LLM")
+            feature_selections = await llm_service.select_features_to_modify(
+                search_results=search_response.features,
+                user_query=request.query,
+                current_modifications=current_mods_info
+            )
+            
+            if not feature_selections:
+                logger.warning("No features selected by LLM for modification")
+                return AutoSteerResponse(
+                    success=False,
+                    search_keywords=keywords,
+                    suggested_features=[]
+                )
+            
+            # Step 5: Apply modifications using existing steer_feature method
+            suggested_features = []
+            applied_count = 0
+            
+            for feature_uuid, modification_value in feature_selections.items():
+                try:
+                    # Find the feature in search results to get its details
+                    feature_info = None
+                    for feature in search_response.features:
+                        if feature.uuid == feature_uuid:
+                            feature_info = feature
+                            break
+                    
+                    if not feature_info:
+                        logger.warning(f"Feature {feature_uuid} not found in search results")
+                        continue
+                    
+                    # Apply the modification using existing steer_feature method
+                    steer_request = VariantSteerRequest(value=modification_value)
+                    await self.steer_feature(
+                        variant_id=request.current_variant_id,
+                        feature_uuid=feature_uuid,
+                        request=steer_request,
+                        ember_client=ember_client
+                    )
+                    
+                    # Create UnifiedFeature with the new pending modification
+                    suggested_feature = self.create_unified_feature(
+                        feature_uuid=feature_uuid,
+                        label=feature_info.label,
+                        activation=feature_info.activation,
+                        variant_id=request.current_variant_id
+                    )
+                    suggested_features.append(suggested_feature)
+                    applied_count += 1
+                    
+                    logger.info(f"Applied auto-steer to feature {feature_uuid} with value {modification_value}")
+                    
+                except Exception as e:
+                    logger.error(f"Error applying modification to feature {feature_uuid}: {str(e)}")
+                    # Continue with other features rather than failing entirely
+                    continue
+            
+            logger.info(f"Auto-steer completed: {applied_count} features modified")
+            return AutoSteerResponse(
+                success=True,
+                search_keywords=keywords,
+                suggested_features=suggested_features
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in auto-steer: {str(e)}")
+            raise Exception(f"Auto-steer failed: {str(e)}")

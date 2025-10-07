@@ -4,7 +4,7 @@ from goodfire import AsyncClient
 
 from ..dependencies import get_ember_client
 from ..services.variant_service import VariantService
-from ..schemas.variant import VariantCreateRequest, VariantResponse, VariantOperationResponse
+from ..schemas.variant import VariantCreateRequest, VariantResponse, VariantOperationResponse, FeatureSearchRequest, FeatureSearchResponse, AutoSteerRequest, AutoSteerResponse
 from ..schemas.feature import VariantSteerRequest, VariantSteerResponse
 
 logger = logging.getLogger(__name__)
@@ -15,6 +15,8 @@ router = APIRouter(prefix="/variants", tags=["variants"])
 def get_variant_service() -> VariantService:
     """Dependency injection for VariantService."""
     return VariantService()
+
+
 
 
 @router.post("/", response_model=VariantResponse)
@@ -184,4 +186,125 @@ async def reject_changes(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to reject changes: {str(e)}"
+        )
+
+
+@router.get("/{variant_id}/features/search", response_model=FeatureSearchResponse)
+async def search_features(
+    variant_id: str,
+    query: str,
+    top_k: int = 10,
+    conversation_id: str = None,
+    ember_client: AsyncClient = Depends(get_ember_client),
+    variant_service: VariantService = Depends(get_variant_service)
+) -> FeatureSearchResponse:
+    """
+    Search for features using semantic similarity.
+    
+    Args:
+        variant_id: UUID of the variant to search within
+        query: Search query string
+        top_k: Maximum number of results to return (default: 10, max: 100)
+        conversation_id: Optional conversation ID to populate activation values
+        ember_client: Ember SDK client
+        variant_service: Injected variant service
+        
+    Returns:
+        FeatureSearchResponse: List of matching features
+        
+    Raises:
+        HTTPException: For validation or service errors
+    """
+    logger.info(f"GET /variants/{variant_id}/features/search - query: '{query}', top_k: {top_k}, conversation_id: {conversation_id}")
+    
+    try:
+        # Create search request
+        search_request = FeatureSearchRequest(query=query, top_k=top_k)
+        
+        # Get activated features if conversation_id is provided
+        activated_features = None
+        if conversation_id:
+            # Import here to avoid circular imports
+            from ..services.conversation_service import ConversationService
+            activated_features = ConversationService._conversation_activated_features.get(conversation_id, {})
+            # Extract just the activation values from UnifiedFeature objects
+            activated_features = {uuid: feature.activation for uuid, feature in activated_features.items() if feature.activation is not None}
+            logger.debug(f"Found {len(activated_features)} activated features for conversation {conversation_id}")
+        
+        response = await variant_service.search_features(
+            variant_id=variant_id,
+            request=search_request,
+            ember_client=ember_client,
+            activated_features=activated_features
+        )
+        logger.info(f"Successfully found {len(response.features)} features for query: '{query}'")
+        return response
+        
+    except ValueError as e:
+        logger.warning(f"Validation error searching features: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error searching features: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to search features: {str(e)}"
+        )
+
+
+@router.post("/{variant_id}/auto-steer", response_model=AutoSteerResponse)
+async def auto_steer(
+    variant_id: str,
+    request: AutoSteerRequest,
+    ember_client: AsyncClient = Depends(get_ember_client),
+    variant_service: VariantService = Depends(get_variant_service)
+) -> AutoSteerResponse:
+    """
+    Automatically steer features based on user query using LLM analysis.
+    
+    Analyzes the user's query and current variant state to suggest and apply
+    feature modifications that align with the user's intent.
+    
+    Args:
+        variant_id: UUID of the variant to auto-steer
+        request: AutoSteerRequest with query and conversation context
+        ember_client: Ember SDK client
+        variant_service: Injected variant service
+        
+    Returns:
+        AutoSteerResponse with suggested features and modifications
+        
+    Raises:
+        HTTPException: For validation or service errors
+    """
+    logger.info(f"POST /variants/{variant_id}/auto-steer - query: '{request.query}'")
+    
+    try:
+        # Validate that the variant_id in the path matches the request
+        if variant_id != request.current_variant_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Variant ID in path must match current_variant_id in request"
+            )
+        
+        response = await variant_service.auto_steer(
+            request=request,
+            ember_client=ember_client
+        )
+        logger.info(f"Auto-steer completed successfully for variant {variant_id}")
+        return response
+        
+    except ValueError as e:
+        logger.warning(f"Validation error in auto-steer: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error in auto-steer: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Auto-steer failed: {str(e)}"
         )
