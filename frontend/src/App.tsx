@@ -19,20 +19,16 @@ function App() {
   
   const [features, setFeatures] = useState<UnifiedFeature[]>([])
   const [featuresLoading, setFeaturesLoading] = useState(false)
-  const [steeringLoading, setSteeringLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [selectedFeature, setSelectedFeature] = useState<UnifiedFeature | null>(null)
-  const [isInComparisonMode, setIsInComparisonMode] = useState(false)
+  const [comparisonState, setComparisonState] = useState<'idle' | 'steering' | 'streaming' | 'complete'>('idle')
+  const [comparisonMode, setComparisonMode] = useState<'manual' | 'auto' | null>(null)
   const [comparisonResponse, setComparisonResponse] = useState<string>('')
-  const [isComparisonStreaming, setIsComparisonStreaming] = useState(false)
   const [originalResponseForComparison, setOriginalResponseForComparison] = useState<string>('')
   const [isControlsVisible, setIsControlsVisible] = useState(true)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [isDeveloperMode, setIsDeveloperMode] = useState(false)
   const [isAutoSteerEnabled, setIsAutoSteerEnabled] = useState(false)
-  
-  // Parallel streaming state for auto-steer
-  const [isParallelStreaming, setIsParallelStreaming] = useState(false)
   
   // Filter and sort state
   const [filterBy, setFilterBy] = useState<FilterOption>('activated')
@@ -206,11 +202,10 @@ function App() {
     try {
       // Enter comparison mode with skeleton immediately for instant feedback
       console.log('Auto-steer parallel: Showing loading state immediately...')
-      setIsInComparisonMode(true)
-      setIsParallelStreaming(true)
+      setComparisonState('steering')
+      setComparisonMode('auto')
       setOriginalResponseForComparison('')
       setComparisonResponse('')
-      setIsComparisonStreaming(true)
       
       console.log('Auto-steer parallel: Starting auto-steer analysis...')
       
@@ -230,9 +225,8 @@ function App() {
       if (!autoSteerResult.success || autoSteerResult.suggested_features.length === 0) {
         console.log('Auto-steer found no modifications, falling back to single response')
         // Exit comparison mode and fall back to single response
-        setIsInComparisonMode(false)
-        setIsParallelStreaming(false)
-        setIsComparisonStreaming(false)
+        setComparisonState('idle')
+        setComparisonMode(null)
         setOriginalResponseForComparison('')
         setComparisonResponse('')
         toast.info('No steering adjustments needed for this query')
@@ -255,13 +249,15 @@ function App() {
       await loadFeatures(conversation.id)
       
       console.log('Auto-steer: Applied pending modifications, starting parallel streaming...')
-      // (Comparison mode already active with skeleton from the start of this function)
       
       // Start both API calls in parallel
       const [defaultStream, steeredStream] = await Promise.all([
         conversationApi.sendMessage(conversation.id, messages, { applyPendingModifications: false }),
         conversationApi.sendMessage(conversation.id, messages, { applyPendingModifications: true })
       ])
+      
+      // Enter streaming state
+      setComparisonState('streaming')
       
       // Create readers for both streams
       const defaultReader = defaultStream.getReader()
@@ -302,8 +298,7 @@ function App() {
       }
       
       // Streaming complete
-      setIsParallelStreaming(false)
-      setIsComparisonStreaming(false)
+      setComparisonState('complete')
       
       // Add the DEFAULT response to conversation history (user can choose to accept steered version later)
       setConversation(prev => ({
@@ -315,9 +310,8 @@ function App() {
       
     } catch (error) {
       console.error('Auto-steer parallel failed:', error)
-      setIsParallelStreaming(false)
-      setIsComparisonStreaming(false)
-      setIsInComparisonMode(false)
+      setComparisonState('idle')
+      setComparisonMode(null)
       toast.error('Auto-steer failed. Falling back to normal response.')
       
       // Fall back to single response
@@ -354,11 +348,9 @@ function App() {
     try {
       console.log('Starting streaming comparison response with pending modifications')
       
-      // Immediately enter comparison mode with the original response
+      // Set the original response for comparison
       setOriginalResponseForComparison(lastAssistantMessage.content)
       setComparisonResponse('') // Start empty, will stream in
-      setIsInComparisonMode(true)
-      setIsComparisonStreaming(true)
       
       // Get conversation history up to and including the last user message
       const lastUserIndex = currentConversation.messages.indexOf(lastUserMessage)
@@ -367,6 +359,9 @@ function App() {
       // Generate steered response (backend will apply pending modifications)
       const comparisonStream = await conversationApi.sendMessage(conversation.id!, messagesForComparison)
       const reader = comparisonStream.getReader()
+      
+      // Enter streaming state
+      setComparisonState('streaming')
       
       // Stream the comparison response in real-time
       let streamingComparisonResponse = ''
@@ -381,14 +376,14 @@ function App() {
         setComparisonResponse(streamingComparisonResponse)
       }
       
-      setIsComparisonStreaming(false)
+      setComparisonState('complete')
       console.log('Comparison response streaming completed successfully')
       
     } catch (error) {
       console.error('Failed to generate comparison response:', error)
       // Exit comparison mode on error
-      setIsInComparisonMode(false)
-      setIsComparisonStreaming(false)
+      setComparisonState('idle')
+      setComparisonMode(null)
       setComparisonResponse('')
       setOriginalResponseForComparison('')
     }
@@ -401,7 +396,10 @@ function App() {
     }
 
     try {
-      setSteeringLoading(true)
+      // Immediately enter manual steering mode and clear right side for instant feedback
+      setComparisonState('steering')
+      setComparisonMode('manual')
+      setComparisonResponse('') // Clear old content so skeleton shows
       console.log('Steering feature:', featureUuid, 'to value:', value)
       
       await variantApi.steerFeature(
@@ -429,8 +427,6 @@ function App() {
       }
     } catch (error) {
       console.error('Failed to steer feature:', error)
-    } finally {
-      setSteeringLoading(false)
     }
   }
 
@@ -461,10 +457,9 @@ function App() {
       }))
       
       // Exit comparison mode
-      setIsInComparisonMode(false)
+      setComparisonState('idle')
+      setComparisonMode(null)
       setComparisonResponse('')
-      setIsComparisonStreaming(false)
-      setIsParallelStreaming(false)
       setOriginalResponseForComparison('')
       
       // Reload features to get updated state
@@ -492,10 +487,9 @@ function App() {
       await variantApi.rejectChanges(conversation.currentVariant.uuid)
       
       // Exit comparison mode (keep original message)
-      setIsInComparisonMode(false)
+      setComparisonState('idle')
+      setComparisonMode(null)
       setComparisonResponse('')
-      setIsComparisonStreaming(false)
-      setIsParallelStreaming(false)
       setOriginalResponseForComparison('')
       
       // Reload features to get updated state
@@ -627,11 +621,10 @@ function App() {
         <div className={`flex-1 ${isControlsVisible ? 'w-3/5' : 'w-full'} transition-all duration-300`}>
           <Chat
             conversation={conversation}
-            isInComparisonMode={isInComparisonMode}
+            comparisonState={comparisonState}
+            comparisonMode={comparisonMode}
             comparisonResponse={comparisonResponse}
             originalResponseForComparison={originalResponseForComparison}
-            isComparisonStreaming={isComparisonStreaming}
-            isParallelStreaming={isParallelStreaming}
             onSendMessage={handleSendMessage}
             onConfirmChanges={handleConfirmChanges}
             onRejectChanges={handleRejectChanges}
@@ -650,7 +643,7 @@ function App() {
               selectedFeature={selectedFeature}
               onFeatureSelect={handleFeatureSelect}
               onSteer={handleSteer}
-              isLoading={featuresLoading || steeringLoading}
+              isLoading={featuresLoading || (comparisonState !== 'idle' && comparisonState !== 'complete')}
               isDeveloperMode={isDeveloperMode}
               filterBy={filterBy}
               sortBy={sortBy}

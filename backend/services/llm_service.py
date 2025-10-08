@@ -142,7 +142,7 @@ Consider:
 - What problem-solving approach would work best?
 
 **Step 3: Keyword Generation**
-Based on the designed persona, generate at most 5 keywords that would help find AI model features to steer the assistant's behavior in that direction."""
+Based on the designed persona, generate at most 5 keywords that would help find AI model features to steer the assistant's behavior in that direction. Ensure that there are some keywords to influence how the assistant should think and respond, not just the content of the response."""
 
         try:
             # Try function calling first

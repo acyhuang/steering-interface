@@ -11,5 +11,3 @@
 - change error view to toast
 - tooltip on activation / modification
 - show activation values in search results
-- consolidate states + loading state for steering comparison vs auto-steer, better steering comparison loading state
-- make sure prev messages show properly during auto-ster

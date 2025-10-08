@@ -10,11 +10,10 @@ import MessageContent from './MessageContent'
 
 interface ChatProps {
   conversation: ConversationState
-  isInComparisonMode: boolean
+  comparisonState: 'idle' | 'steering' | 'streaming' | 'complete'
+  comparisonMode: 'manual' | 'auto' | null
   comparisonResponse: string
   originalResponseForComparison: string
-  isComparisonStreaming: boolean
-  isParallelStreaming: boolean
   onSendMessage: (content: string) => Promise<void>
   onConfirmChanges: () => Promise<void>
   onRejectChanges: () => Promise<void>
@@ -26,11 +25,10 @@ interface ChatProps {
 
 export default function Chat({
   conversation,
-  isInComparisonMode,
+  comparisonState,
+  comparisonMode,
   comparisonResponse,
   originalResponseForComparison,
-  isComparisonStreaming,
-  isParallelStreaming,
   onSendMessage,
   onConfirmChanges,
   onRejectChanges,
@@ -110,7 +108,7 @@ export default function Chat({
             <div><strong>Messages:</strong> {conversation.messages.length}</div>
             <div><strong>Streaming:</strong> {isStreaming ? 'Yes' : 'No'}</div>
             <div><strong>Features:</strong> {featuresLoading ? 'Loading...' : 'Ready'}</div>
-            <div><strong>Comparison:</strong> {isInComparisonMode ? 'Active' : 'Off'}</div>
+            <div><strong>Comparison:</strong> {comparisonState} ({comparisonMode || 'none'})</div>
           </div>
         </div>
       )}
@@ -128,7 +126,7 @@ export default function Chat({
                 {conversation.messages.map((message, index) => {
                   // Hide the last assistant message when in comparison mode and we have comparison content
                   // Don't hide it during initial loading (when both responses are empty)
-                  if (isInComparisonMode && (originalResponseForComparison || comparisonResponse)) {
+                  if (comparisonState !== 'idle' && (originalResponseForComparison || comparisonResponse)) {
                     const lastAssistantIndex = [...conversation.messages].map((m, i) => m.role === 'assistant' ? i : -1)
                       .filter(i => i !== -1)
                       .pop() ?? -1
@@ -139,14 +137,16 @@ export default function Chat({
                   return renderMessage(message, index)
                 })}
                 {/* Show comparison mode content if active */}
-                {isInComparisonMode && (
+                {comparisonState !== 'idle' && (
                   <div className="mt-6 space-y-4">
                     <div className="text-center">
                       <h3 className="text-lg font-medium text-foreground">
-                        {isParallelStreaming ? 'Suggesting steered features...' : 'Which response do you prefer?'}
+                        {comparisonState === 'steering' 
+                          ? (comparisonMode === 'auto' ? 'Suggesting features to steer on...' : 'Applying steered feature...')
+                          : 'Which response do you prefer?'}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        {isParallelStreaming ? '' : 'Click on the response you\'d like to keep'}
+                        {(comparisonState === 'streaming' || comparisonState === 'complete') ? 'Click on the response you\'d like to keep' : ''}
                       </p>
                     </div>
                     
@@ -154,15 +154,15 @@ export default function Chat({
                       {/* Original Response Card */}
                       <div 
                         className={`p-4 border rounded-lg bg-card transition-colors ${
-                          isParallelStreaming ? '' : 'hover:bg-muted/50 cursor-pointer'
+                          comparisonState === 'complete' ? 'hover:bg-muted/50 cursor-pointer' : ''
                         }`}
-                        onClick={isParallelStreaming ? undefined : onRejectChanges}
+                        onClick={comparisonState === 'complete' ? onRejectChanges : undefined}
                       >
                         <div className="text-sm font-medium mb-2 text-sm text-muted-foreground text-center font-mono">ORIGINAL RESPONSE</div>
                         <div className="text-base text-foreground">
                           {originalResponseForComparison ? (
                             <MessageContent message={{ role: 'assistant', content: originalResponseForComparison }} />
-                          ) : isParallelStreaming ? (
+                          ) : (comparisonState === 'steering' && comparisonMode === 'auto') ? (
                             <div className="space-y-2">
                               <Skeleton className="h-4 w-full" />
                               <Skeleton className="h-4 w-5/6" />
@@ -175,15 +175,15 @@ export default function Chat({
                       {/* Steered Response Card */}
                       <div 
                         className={`p-4 border rounded-lg bg-card transition-colors ${
-                          isComparisonStreaming ? '' : 'hover:bg-muted/50 cursor-pointer'
+                          comparisonState === 'complete' ? 'hover:bg-muted/50 cursor-pointer' : ''
                         }`}
-                        onClick={isComparisonStreaming ? undefined : onConfirmChanges}
+                        onClick={comparisonState === 'complete' ? onConfirmChanges : undefined}
                       >
                         <div className="text-sm font-medium text-sm mb-2 text-muted-foreground text-center gap-2 text-center font-mono">STEERED RESPONSE</div>
                         <div className="text-base text-foreground">
                           {comparisonResponse ? (
                             <MessageContent message={{ role: 'assistant', content: comparisonResponse }} />
-                          ) : isComparisonStreaming ? (
+                          ) : (comparisonState === 'steering' || comparisonState === 'streaming') ? (
                             <div className="space-y-2">
                               <Skeleton className="h-4 w-full" />
                               <Skeleton className="h-4 w-5/6" />
@@ -196,7 +196,7 @@ export default function Chat({
                         {pendingFeatures.length > 0 && (
                           <div className="mt-4 pt-4 border-t">
                             <div className="text-xs text-muted-foreground mb-2 font-medium">Steered Features:</div>
-                            {isParallelStreaming ? (
+                            {comparisonState === 'steering' ? (
                               <div className="flex flex-wrap gap-1">
                                 <Skeleton className="h-6 w-24" />
                                 <Skeleton className="h-6 w-32" />
