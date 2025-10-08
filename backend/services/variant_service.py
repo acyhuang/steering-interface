@@ -416,9 +416,9 @@ class VariantService:
                 for feature_uuid, value in current_modifications.items():
                     current_mods_info[f"Feature {feature_uuid}"] = value
             
-            # Step 1: Generate search keywords using LLM
-            logger.debug("Generating search keywords with LLM")
-            keywords = await llm_service.generate_search_keywords(
+            # Step 1: Generate search keywords and persona using LLM
+            logger.debug("Generating search keywords and persona with LLM")
+            keywords, persona = await llm_service.generate_search_keywords(
                 user_query=request.query,
                 conversation_context=request.conversation_context,
                 current_modifications=current_mods_info
@@ -457,7 +457,8 @@ class VariantService:
             feature_selections = await llm_service.select_features_to_modify(
                 search_results=search_response.features,
                 user_query=request.query,
-                current_modifications=current_mods_info
+                current_modifications=current_mods_info,
+                persona=persona
             )
             
             if not feature_selections:

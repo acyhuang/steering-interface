@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 import openai
 from openai import AsyncOpenAI
 
@@ -24,11 +24,11 @@ class LLMService:
         logger.info("LLMService initialized with OpenAI client")
     
     def _get_keyword_generation_functions(self) -> List[Dict]:
-        """Get function schema for keyword generation."""
+        """Get function schema for keyword generation and persona design."""
         return [
             {
                 "name": "generate_keywords",
-                "description": "Generate search keywords for AI model feature discovery",
+                "description": "Generate search keywords and persona for AI model feature discovery",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -36,11 +36,15 @@ class LLMService:
                             "type": "array",
                             "items": {"type": "string"},
                             "minItems": 1,
-                            "maxItems": 5,
+                            "maxItems": 3,
                             "description": "Keywords for searching AI model features"
+                        },
+                        "persona": {
+                            "type": "string",
+                            "description": "Brief 1-2 sentence description of the optimal AI assistant persona for this query"
                         }
                     },
-                    "required": ["keywords"]
+                    "required": ["keywords", "persona"]
                 }
             }
         ]
@@ -87,9 +91,9 @@ class LLMService:
         user_query: str,
         conversation_context: Optional[List[str]] = None,
         current_modifications: Optional[Dict[str, float]] = None
-    ) -> List[str]:
+    ) -> Tuple[List[str], str]:
         """
-        Generate search keywords based on user query and context.
+        Generate search keywords and persona based on user query and context.
         
         Uses a three-step process:
         1. Intent Analysis - understand what user is trying to achieve
@@ -102,7 +106,7 @@ class LLMService:
             current_modifications: Current feature modifications (feature labels + values)
             
         Returns:
-            List[str]: Up to 5 keywords for feature search
+            Tuple[List[str], str]: (keywords for feature search, persona description)
             
         Raises:
             Exception: If OpenAI API call fails
@@ -142,7 +146,7 @@ Consider:
 - What problem-solving approach would work best?
 
 **Step 3: Keyword Generation**
-Based on the designed persona, generate at most 5 keywords that would help find AI model features to steer the assistant's behavior in that direction. Ensure that there are some keywords to influence how the assistant should think and respond, not just the content of the response."""
+Based on the designed persona, generate at most 3 keywords that would help find AI model features to steer the assistant's behavior in that direction. Prioritize keywords for the persona over the user's query."""
 
         try:
             # Try function calling first
@@ -158,16 +162,19 @@ Based on the designed persona, generate at most 5 keywords that would help find 
                 temperature=0.7
             )
             
-            # Extract keywords from function call
+            # Extract keywords and persona from function call
             function_call = response.choices[0].message.function_call
             if function_call and function_call.name == "generate_keywords":
                 import json
                 args = json.loads(function_call.arguments)
                 keywords = args.get('keywords', [])
-                logger.info(f"Generated {len(keywords)} keywords via function calling: {keywords}")
+                persona = args.get('persona', '')
+                logger.info(f"Generated {len(keywords)} keywords and persona via function calling")
+                logger.info(f"  Keywords: {keywords}")
+                logger.info(f"  Persona: {persona}")
                 # Truncate keywords to fit query length limit
                 truncated_keywords = self._truncate_keywords_to_query_limit(keywords)
-                return truncated_keywords
+                return truncated_keywords, persona
             
         except Exception as e:
             logger.warning(f"Function calling failed, falling back to JSON parsing: {str(e)}")
@@ -178,7 +185,7 @@ Based on the designed persona, generate at most 5 keywords that would help find 
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are an expert at analyzing user intent and designing AI assistant personas."},
-                    {"role": "user", "content": prompt + "\n\nRespond with JSON only: {\"keywords\": [\"word1\", \"word2\", \"word3\", \"word4\", \"word5\"]}"}
+                    {"role": "user", "content": prompt + "\n\nRespond with JSON only: {\"keywords\": [\"word1\", \"word2\"], \"persona\": \"Brief persona description\"}"}
                 ],
                 max_tokens=500,
                 temperature=0.7
@@ -187,12 +194,15 @@ Based on the designed persona, generate at most 5 keywords that would help find 
             content = response.choices[0].message.content
             logger.debug(f"OpenAI response: {content}")
             
-            # Extract keywords from response
+            # Extract keywords and persona from response
             keywords = self._extract_keywords(content)
-            logger.info(f"Generated {len(keywords)} keywords via fallback: {keywords}")
+            persona = self._extract_persona(content)
+            logger.info(f"Generated {len(keywords)} keywords and persona via fallback")
+            logger.info(f"  Keywords: {keywords}")
+            logger.info(f"  Persona: {persona}")
             # Truncate keywords to fit query length limit
             truncated_keywords = self._truncate_keywords_to_query_limit(keywords)
-            return truncated_keywords
+            return truncated_keywords, persona
             
         except Exception as e:
             logger.error(f"Error generating search keywords: {str(e)}")
@@ -202,7 +212,8 @@ Based on the designed persona, generate at most 5 keywords that would help find 
         self,
         search_results: List[UnifiedFeature],
         user_query: str,
-        current_modifications: Optional[Dict[str, float]] = None
+        current_modifications: Optional[Dict[str, float]] = None,
+        persona: Optional[str] = None
     ) -> Dict[str, float]:
         """
         Select 1-2 features from search results and suggest modification values.
@@ -211,6 +222,7 @@ Based on the designed persona, generate at most 5 keywords that would help find 
             search_results: List of UnifiedFeature objects from feature search
             user_query: The user's original query
             current_modifications: Current feature modifications (optional)
+            persona: Target AI assistant persona for context (optional)
             
         Returns:
             Dict[str, float]: Mapping of feature_uuid -> modification_value (1-2 features)
@@ -234,29 +246,43 @@ Based on the designed persona, generate at most 5 keywords that would help find 
                 features_info += f"   Current modification: {feature.modification}\n"
             features_info += "\n"
         
+        # Build persona context
+        persona_context = ""
+        if persona:
+            persona_context = f"""Target Persona: {persona}
+
+Your goal is to select features that help steer the AI assistant toward this persona.
+
+"""
+        
+        # Build current modifications info with emphasis on avoiding overlap
         current_mods_info = ""
         if current_modifications:
-            current_mods_info = f"Current modifications:\n"
+            current_mods_info = f"""Currently Modified Features:
+"""
             for label, value in current_modifications.items():
-                current_mods_info += f"- {label}: {value}\n"
-            current_mods_info += "\n"
+                direction = "increased" if value > 0 else "decreased" if value < 0 else "neutral"
+                current_mods_info += f"- {label}: {value:+.1f} ({direction})\n"
+            current_mods_info += f""""""
         
         prompt = f"""You are an expert at selecting AI model features for steering behavior.
 
-{current_mods_info}User Query: "{user_query}"
+{persona_context}{current_mods_info}User Query: "{user_query}"
 
 Available features from search:
 {features_info}
 
-Please select 1-2 features that would best help achieve the user's intent. For each selected feature, suggest a modification value between -0.6 and 0.6 in increments of 0.2:
+Please select 1-2 features that would best help achieve the target persona. For each selected feature, suggest a modification value between -0.6 and 0.6 in increments of 0.2:
 - Positive values (0.1 to 0.6) increase the feature's influence
 - Negative values (-0.1 to -0.6) decrease the feature's influence
-- Values closer to 0 have subtle effects, values closer to ±1 have strong effects
+- Values closer to 0 have subtle effects, values closer to ±0.6 have strong effects
 
-Consider:
-- Which features are most relevant to the user's request?
-- What modification strength would be appropriate?
-- Don't over-modify (avoid too many features or extreme values)"""
+Selection Criteria (in priority order):
+1. Relevance to target persona - Does this feature help achieve the desired persona characteristics?
+2. Relevance to user query - Does this feature help achieve the user's intent?
+3. Avoid redundancy - Don't select features that overlap significantly with currently modified features
+4. Appropriate strength - Match the modification strength to the desired intensity of the effect
+"""
 
         try:
             # Try function calling first
@@ -362,6 +388,47 @@ Consider:
         except Exception as e:
             logger.error(f"Error extracting keywords: {str(e)}")
             return []
+    
+    def _extract_persona(self, content: str) -> str:
+        """Extract persona description from OpenAI JSON response."""
+        try:
+            import json
+            
+            # Try to parse the entire response as JSON
+            response_data = json.loads(content.strip())
+            persona = response_data.get('persona', '')
+            
+            # Validate persona is a string
+            if isinstance(persona, str):
+                persona = persona.strip()
+                logger.debug(f"Extracted persona from JSON: {persona}")
+                return persona
+            else:
+                logger.warning(f"Persona field is not a string: {persona}")
+                return ''
+                
+        except json.JSONDecodeError as e:
+            logger.warning(f"Could not parse JSON response for persona: {str(e)}")
+            logger.debug(f"Raw response content: {content}")
+            
+            # Fallback: try to extract JSON from the response
+            try:
+                import re
+                json_match = re.search(r'\{[^}]*"persona"[^}]*\}', content, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    response_data = json.loads(json_str)
+                    persona = response_data.get('persona', '')
+                    if isinstance(persona, str):
+                        return persona.strip()
+            except Exception as fallback_e:
+                logger.warning(f"Fallback persona extraction failed: {str(fallback_e)}")
+            
+            return ''
+            
+        except Exception as e:
+            logger.error(f"Error extracting persona: {str(e)}")
+            return ''
     
     def _extract_feature_selections(self, content: str, search_results: List[UnifiedFeature]) -> Dict[str, float]:
         """Extract feature selections from OpenAI JSON response."""
