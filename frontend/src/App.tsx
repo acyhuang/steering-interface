@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { PanelRight, Moon, Sun, Code } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Toaster } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import { conversationApi, variantApi } from '@/services/api'
 import type { ConversationState, UnifiedFeature, FilterOption, SortOption, SortOrder } from '@/types'
 import Chat from './components/Chat'
@@ -27,6 +29,7 @@ function App() {
   const [isControlsVisible, setIsControlsVisible] = useState(true)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [isDeveloperMode, setIsDeveloperMode] = useState(false)
+  const [isAutoSteerEnabled, setIsAutoSteerEnabled] = useState(false)
   
   // Filter and sort state
   const [filterBy, setFilterBy] = useState<FilterOption>('activated')
@@ -164,8 +167,73 @@ function App() {
       console.log('Message completed, loading features...')
       
       // Load features after message completion (features activate after messages)
-      // This runs in background - user can send another message while this loads
       await loadFeatures(conversation.id)
+      
+      // Auto-steer logic: if enabled, trigger auto-steer and comparison
+      if (isAutoSteerEnabled && conversation.currentVariant) {
+        try {
+          console.log('Auto-steer enabled, triggering auto-steer...')
+          
+          // Extract the current user query (last user message)
+          const lastUserMessage = messages.filter(m => m.role === 'user').pop()
+          const query = lastUserMessage?.content || ''
+          
+          // Convert conversation history to simple strings (last 6 messages for context)
+          const conversationContext = messages
+            .slice(-6)
+            .map(msg => `${msg.role}: ${msg.content}`)
+          
+          // Call auto-steer API with correct format
+          const autoSteerResult = await variantApi.autoSteer(
+            conversation.currentVariant.uuid,
+            query,
+            conversationContext
+          )
+          
+          // Check if auto-steer was successful and returned suggestions
+          if (!autoSteerResult.success || autoSteerResult.suggested_features.length === 0) {
+            toast.warning('Auto-steer could not find suitable features to modify. Try rephrasing your request.')
+            return
+          }
+          
+          // Apply suggested modifications as pending changes
+          // The backend returns suggested_features (UnifiedFeature objects) with pending_modification values
+          for (const feature of autoSteerResult.suggested_features) {
+            if (feature.pending_modification !== null) {
+              await variantApi.steerFeature(
+                conversation.currentVariant.uuid,
+                feature.uuid,
+                feature.pending_modification
+              )
+            }
+          }
+          
+          // Reload features to get updated pending modifications
+          const updatedFeatures = await loadFeatures(conversation.id)
+          
+          // Debug: Check what features we got back
+          console.log('Auto-steer: Updated features count:', updatedFeatures.length)
+          const featuresWithPending = updatedFeatures.filter(f => f.pending_modification !== null)
+          console.log('Auto-steer: Features with pending modifications:', featuresWithPending.length)
+          console.log('Auto-steer: Pending features:', featuresWithPending.map(f => ({ label: f.label, pending: f.pending_modification })))
+          
+          // Build current conversation state locally (React state updates are async, so we need to construct this manually)
+          const currentConversation: ConversationState = {
+            id: conversation.id,
+            messages: [...conversation.messages, userMessage, { role: 'assistant', content: fullResponse }],
+            currentVariant: conversation.currentVariant,
+            isLoading: false
+          }
+          
+          // Generate comparison response if we have pending modifications
+          await generateComparisonResponse(updatedFeatures, currentConversation)
+                    
+        } catch (error) {
+          console.error('Auto-steer failed:', error)
+          toast.error('Auto-steer failed. Continuing with normal response.')
+          // Don't throw - let the user continue with normal flow
+        }
+      }
     } catch (error) {
       console.error('Failed to send message:', error)
       setIsStreaming(false)
@@ -177,17 +245,22 @@ function App() {
     setSelectedFeature(feature)
   }
 
-  const generateComparisonResponse = async (freshFeatures: UnifiedFeature[]) => {
+  const generateComparisonResponse = async (freshFeatures: UnifiedFeature[], currentConversation: ConversationState) => {
     // Check if we have pending modifications
     const hasPendingModifications = freshFeatures.some(f => f.pending_modification !== null)
     
-    if (!hasPendingModifications || conversation.messages.length === 0) {
+    console.log('generateComparisonResponse: hasPendingModifications =', hasPendingModifications)
+    console.log('generateComparisonResponse: currentConversation.messages.length =', currentConversation.messages.length)
+    console.log('generateComparisonResponse: features with pending modifications:', freshFeatures.filter(f => f.pending_modification !== null))
+    
+    if (!hasPendingModifications || currentConversation.messages.length === 0) {
+      console.log('generateComparisonResponse: Skipping - no pending modifications or no messages')
       return
     }
 
     // Find the last assistant message to use as comparison basis
-    const lastAssistantMessage = [...conversation.messages].reverse().find((m: any) => m.role === 'assistant')
-    const lastUserMessage = [...conversation.messages].reverse().find((m: any) => m.role === 'user')
+    const lastAssistantMessage = [...currentConversation.messages].reverse().find((m: any) => m.role === 'assistant')
+    const lastUserMessage = [...currentConversation.messages].reverse().find((m: any) => m.role === 'user')
     
     if (!lastAssistantMessage || !lastUserMessage) {
       console.log('No assistant or user message found for comparison')
@@ -204,8 +277,8 @@ function App() {
       setIsComparisonStreaming(true)
       
       // Get conversation history up to and including the last user message
-      const lastUserIndex = conversation.messages.indexOf(lastUserMessage)
-      const messagesForComparison = conversation.messages.slice(0, lastUserIndex + 1)
+      const lastUserIndex = currentConversation.messages.indexOf(lastUserMessage)
+      const messagesForComparison = currentConversation.messages.slice(0, lastUserIndex + 1)
       
       // Generate steered response (backend will apply pending modifications)
       const comparisonStream = await conversationApi.sendMessage(conversation.id!, messagesForComparison)
@@ -268,7 +341,7 @@ function App() {
         }
         
         // Generate comparison response if we have pending modifications
-        await generateComparisonResponse(freshFeatures)
+        await generateComparisonResponse(freshFeatures, conversation)
       }
     } catch (error) {
       console.error('Failed to steer feature:', error)
@@ -428,6 +501,7 @@ function App() {
 
   return (
     <div className="h-screen flex flex-col">
+      <Toaster />
       {/* Navigation Bar */}
       <nav className="bg-background border-b border-border px-4 py-3 flex justify-between items-center">
         <span className="text-xl font-medium">steering-interface</span>
@@ -498,6 +572,8 @@ function App() {
               onSortChange={setSortBy}
               onSortOrderChange={setSortOrder}
               currentVariantId={conversation.currentVariant?.uuid || null}
+              isAutoSteerEnabled={isAutoSteerEnabled}
+              onAutoSteerToggle={setIsAutoSteerEnabled}
             />
           </div>
         )}

@@ -101,5 +101,18 @@ export const variantApi = {
     });
     return response.data.features;
   },
+
+  autoSteer: async (
+    variantId: string,
+    query: string,
+    conversationContext: string[]
+  ): Promise<{ success: boolean; search_keywords: string[]; suggested_features: UnifiedFeature[] }> => {
+    const response = await apiClient.post(`/variants/${variantId}/auto-steer`, {
+      query,
+      current_variant_id: variantId,
+      conversation_context: conversationContext
+    });
+    return response.data;
+  },
 };
 

@@ -23,6 +23,65 @@ class LLMService:
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         logger.info("LLMService initialized with OpenAI client")
     
+    def _get_keyword_generation_functions(self) -> List[Dict]:
+        """Get function schema for keyword generation."""
+        return [
+            {
+                "name": "generate_keywords",
+                "description": "Generate search keywords for AI model feature discovery",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "keywords": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 1,
+                            "maxItems": 5,
+                            "description": "Keywords for searching AI model features"
+                        }
+                    },
+                    "required": ["keywords"]
+                }
+            }
+        ]
+    
+    def _get_feature_selection_functions(self) -> List[Dict]:
+        """Get function schema for feature selection."""
+        return [
+            {
+                "name": "select_features",
+                "description": "Select AI model features to modify for behavior steering",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selections": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "feature_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the feature to modify"
+                                    },
+                                    "modification_value": {
+                                        "type": "number",
+                                        "minimum": -0.6,
+                                        "maximum": 0.6,
+                                        "description": "Modification value between -0.6 and 0.6"
+                                    }
+                                },
+                                "required": ["feature_uuid", "modification_value"]
+                            },
+                            "minItems": 1,
+                            "maxItems": 2,
+                            "description": "Selected features with modification values"
+                        }
+                    },
+                    "required": ["selections"]
+                }
+            }
+        ]
+    
     async def generate_search_keywords(
         self,
         user_query: str,
@@ -83,16 +142,43 @@ Consider:
 - What problem-solving approach would work best?
 
 **Step 3: Keyword Generation**
-Based on the designed persona, generate exactly 5 keywords that would help find AI model features to steer the assistant's behavior in that direction.
-
-Respond with JSON only: {{"keywords": ["word1", "word2", "word3", "word4", "word5"]}}"""
+Based on the designed persona, generate at most 5 keywords that would help find AI model features to steer the assistant's behavior in that direction."""
 
         try:
+            # Try function calling first
             response = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are an expert at analyzing user intent and designing AI assistant personas."},
                     {"role": "user", "content": prompt}
+                ],
+                functions=self._get_keyword_generation_functions(),
+                function_call={"name": "generate_keywords"},
+                max_tokens=500,
+                temperature=0.7
+            )
+            
+            # Extract keywords from function call
+            function_call = response.choices[0].message.function_call
+            if function_call and function_call.name == "generate_keywords":
+                import json
+                args = json.loads(function_call.arguments)
+                keywords = args.get('keywords', [])
+                logger.info(f"Generated {len(keywords)} keywords via function calling: {keywords}")
+                # Truncate keywords to fit query length limit
+                truncated_keywords = self._truncate_keywords_to_query_limit(keywords)
+                return truncated_keywords
+            
+        except Exception as e:
+            logger.warning(f"Function calling failed, falling back to JSON parsing: {str(e)}")
+        
+        # Fallback to original JSON parsing approach
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are an expert at analyzing user intent and designing AI assistant personas."},
+                    {"role": "user", "content": prompt + "\n\nRespond with JSON only: {\"keywords\": [\"word1\", \"word2\", \"word3\", \"word4\", \"word5\"]}"}
                 ],
                 max_tokens=500,
                 temperature=0.7
@@ -103,8 +189,10 @@ Respond with JSON only: {{"keywords": ["word1", "word2", "word3", "word4", "word
             
             # Extract keywords from response
             keywords = self._extract_keywords(content)
-            logger.info(f"Generated {len(keywords)} keywords: {keywords}")
-            return keywords
+            logger.info(f"Generated {len(keywords)} keywords via fallback: {keywords}")
+            # Truncate keywords to fit query length limit
+            truncated_keywords = self._truncate_keywords_to_query_limit(keywords)
+            return truncated_keywords
             
         except Exception as e:
             logger.error(f"Error generating search keywords: {str(e)}")
@@ -168,21 +256,50 @@ Please select 1-2 features that would best help achieve the user's intent. For e
 Consider:
 - Which features are most relevant to the user's request?
 - What modification strength would be appropriate?
-- Don't over-modify (avoid too many features or extreme values)
-
-Respond with JSON only: {{
-  "selections": [
-    {{"label": "explanation style", "value": 0.4}},
-    {{"label": "beginner friendly", "value": -0.2}}
-  ]
-}}"""
+- Don't over-modify (avoid too many features or extreme values)"""
 
         try:
+            # Try function calling first
             response = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are an expert at selecting and modifying AI model features for behavior steering."},
                     {"role": "user", "content": prompt}
+                ],
+                functions=self._get_feature_selection_functions(),
+                function_call={"name": "select_features"},
+                max_tokens=400,
+                temperature=0.5
+            )
+            
+            # Extract selections from function call
+            function_call = response.choices[0].message.function_call
+            if function_call and function_call.name == "select_features":
+                import json
+                args = json.loads(function_call.arguments)
+                selections_data = args.get('selections', [])
+                
+                # Convert to expected format (feature_uuid -> modification_value)
+                selections = {}
+                for selection in selections_data:
+                    feature_uuid = selection.get('feature_uuid')
+                    modification_value = selection.get('modification_value')
+                    if feature_uuid and modification_value is not None:
+                        selections[feature_uuid] = float(modification_value)
+                
+                logger.info(f"Selected {len(selections)} features via function calling: {list(selections.keys())}")
+                return selections
+            
+        except Exception as e:
+            logger.warning(f"Function calling failed, falling back to JSON parsing: {str(e)}")
+        
+        # Fallback to original JSON parsing approach
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are an expert at selecting and modifying AI model features for behavior steering."},
+                    {"role": "user", "content": prompt + "\n\nRespond with JSON only: {\n  \"selections\": [\n    {\"label\": \"explanation style\", \"value\": 0.4},\n    {\"label\": \"beginner friendly\", \"value\": -0.2}\n  ]\n}"}
                 ],
                 max_tokens=400,
                 temperature=0.5
@@ -193,7 +310,7 @@ Respond with JSON only: {{
             
             # Extract feature selections from response
             selections = self._extract_feature_selections(content, search_results)
-            logger.info(f"Selected {len(selections)} features for modification: {list(selections.keys())}")
+            logger.info(f"Selected {len(selections)} features via fallback: {list(selections.keys())}")
             return selections
             
         except Exception as e:
@@ -335,6 +452,52 @@ Respond with JSON only: {{
             logger.error(f"Error extracting feature selections: {str(e)}")
             return {}
     
+    def _truncate_keywords_to_query_limit(self, keywords: List[str], max_length: int = 100) -> List[str]:
+        """
+        Truncate keywords to ensure the combined query stays under the character limit.
+        
+        Args:
+            keywords: List of keyword strings
+            max_length: Maximum allowed length for the combined query (default: 100)
+            
+        Returns:
+            List[str]: Truncated keywords that fit within the limit
+        """
+        if not keywords:
+            return keywords
+        
+        # Join keywords with spaces to simulate the actual query
+        current_query = " ".join(keywords)
+        
+        if len(current_query) <= max_length:
+            return keywords
+        
+        logger.warning(f"Keywords query too long ({len(current_query)} chars), truncating to fit {max_length} char limit")
+        
+        # Truncate keywords one by one from the end until we fit
+        truncated_keywords = keywords.copy()
+        
+        while truncated_keywords and len(" ".join(truncated_keywords)) > max_length:
+            truncated_keywords.pop()
+        
+        # If we still don't fit, try truncating individual keywords
+        if truncated_keywords:
+            final_query = " ".join(truncated_keywords)
+            if len(final_query) > max_length:
+                # Truncate the last keyword to fit
+                last_keyword = truncated_keywords[-1]
+                remaining_space = max_length - len(" ".join(truncated_keywords[:-1])) - 1  # -1 for space
+                
+                if remaining_space > 0:
+                    truncated_keywords[-1] = last_keyword[:remaining_space]
+                else:
+                    truncated_keywords.pop()
+        
+        final_query = " ".join(truncated_keywords)
+        logger.info(f"Truncated keywords from {len(keywords)} to {len(truncated_keywords)} items: '{final_query}' ({len(final_query)} chars)")
+        
+        return truncated_keywords
+
     def _find_feature_uuid_by_label(self, label: str, search_results: List[UnifiedFeature]) -> Optional[str]:
         """Find feature UUID by matching label (case-insensitive, partial matching)."""
         try:

@@ -21,6 +21,8 @@ interface ControlsProps {
   onSortChange: (sort: SortOption) => void
   onSortOrderChange: (order: SortOrder) => void
   currentVariantId: string | null
+  isAutoSteerEnabled: boolean
+  onAutoSteerToggle: (enabled: boolean) => void
 }
 
 export default function Controls({
@@ -36,7 +38,9 @@ export default function Controls({
   onFilterChange,
   onSortChange,
   onSortOrderChange,
-  currentVariantId
+  currentVariantId,
+  isAutoSteerEnabled,
+  onAutoSteerToggle
 }: ControlsProps) {
   // Search state
   const [searchState, setSearchState] = useState<SearchState>({
@@ -102,7 +106,20 @@ export default function Controls({
       )}
       
       <div className="p-3 border-b border-border">
-        <div className="text-base font-mono uppercase font-medium">Controls</div>
+        <div className="flex items-center justify-between">
+          <div className="text-base font-mono uppercase font-medium">Controls</div>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={isAutoSteerEnabled}
+                onChange={(e) => onAutoSteerToggle(e.target.checked)}
+                className="rounded border-border"
+              />
+              <span className="text-xs text-muted-foreground">Auto-steer</span>
+            </label>
+          </div>
+        </div>
       </div>
       
       <div className="flex-1 flex flex-col overflow-hidden p-2">
