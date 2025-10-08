@@ -5,6 +5,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import MessageContent from './MessageContent'
 
 interface ChatProps {
@@ -13,6 +14,7 @@ interface ChatProps {
   comparisonResponse: string
   originalResponseForComparison: string
   isComparisonStreaming: boolean
+  isParallelStreaming: boolean
   onSendMessage: (content: string) => Promise<void>
   onConfirmChanges: () => Promise<void>
   onRejectChanges: () => Promise<void>
@@ -28,6 +30,7 @@ export default function Chat({
   comparisonResponse,
   originalResponseForComparison,
   isComparisonStreaming,
+  isParallelStreaming,
   onSendMessage,
   onConfirmChanges,
   onRejectChanges,
@@ -123,8 +126,9 @@ export default function Chat({
             <div className="max-w-3xl mx-auto p-4">
               <div>
                 {conversation.messages.map((message, index) => {
-                  // Hide the last assistant message when in comparison mode
-                  if (isInComparisonMode) {
+                  // Hide the last assistant message when in comparison mode and we have comparison content
+                  // Don't hide it during initial loading (when both responses are empty)
+                  if (isInComparisonMode && (originalResponseForComparison || comparisonResponse)) {
                     const lastAssistantIndex = [...conversation.messages].map((m, i) => m.role === 'assistant' ? i : -1)
                       .filter(i => i !== -1)
                       .pop() ?? -1
@@ -138,19 +142,33 @@ export default function Chat({
                 {isInComparisonMode && (
                   <div className="mt-6 space-y-4">
                     <div className="text-center">
-                      <h3 className="text-lg font-medium text-foreground">Which response do you prefer?</h3>
-                      <p className="text-sm text-muted-foreground">Click on the response you'd like to keep</p>
+                      <h3 className="text-lg font-medium text-foreground">
+                        {isParallelStreaming ? 'Suggesting steered features...' : 'Which response do you prefer?'}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {isParallelStreaming ? '' : 'Click on the response you\'d like to keep'}
+                      </p>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Original Response Card */}
                       <div 
-                        className="p-4 border rounded-lg bg-card hover:bg-muted/50 cursor-pointer transition-colors"
-                        onClick={onRejectChanges}
+                        className={`p-4 border rounded-lg bg-card transition-colors ${
+                          isParallelStreaming ? '' : 'hover:bg-muted/50 cursor-pointer'
+                        }`}
+                        onClick={isParallelStreaming ? undefined : onRejectChanges}
                       >
                         <div className="text-sm font-medium mb-2 text-sm text-muted-foreground text-center font-mono">ORIGINAL RESPONSE</div>
                         <div className="text-base text-foreground">
-                          <MessageContent message={{ role: 'assistant', content: originalResponseForComparison }} />
+                          {originalResponseForComparison ? (
+                            <MessageContent message={{ role: 'assistant', content: originalResponseForComparison }} />
+                          ) : isParallelStreaming ? (
+                            <div className="space-y-2">
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-5/6" />
+                              <Skeleton className="h-4 w-4/6" />
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                       
@@ -166,25 +184,36 @@ export default function Chat({
                           {comparisonResponse ? (
                             <MessageContent message={{ role: 'assistant', content: comparisonResponse }} />
                           ) : isComparisonStreaming ? (
-                            <span className="text-muted-foreground italic">Generating steered response...</span>
+                            <div className="space-y-2">
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-5/6" />
+                              <Skeleton className="h-4 w-4/6" />
+                            </div>
                           ) : null}
                         </div>
                         
                         {/* Pending Features Badges */}
                         {pendingFeatures.length > 0 && (
-                          <div className="mt-2 pt-2">
-                            <div className="text-xs text-muted-foreground mb-2 font-medium">Pending Changes:</div>
-                            <div className="flex flex-wrap gap-1">
-                              {pendingFeatures.map((feature) => (
-                                <Badge
-                                  key={feature.uuid}
-                                  variant="secondary"
-                                  className="text-xs"
-                                >
-                                  {feature.label}: {feature.pending_modification !== null ? feature.pending_modification.toFixed(1) : '0.0'}
-                                </Badge>
-                              ))}
-                            </div>
+                          <div className="mt-4 pt-4 border-t">
+                            <div className="text-xs text-muted-foreground mb-2 font-medium">Steered Features:</div>
+                            {isParallelStreaming ? (
+                              <div className="flex flex-wrap gap-1">
+                                <Skeleton className="h-6 w-24" />
+                                <Skeleton className="h-6 w-32" />
+                              </div>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {pendingFeatures.map((feature) => (
+                                  <Badge
+                                    key={feature.uuid}
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    {feature.label}: {feature.pending_modification !== null ? feature.pending_modification.toFixed(1) : '0.0'}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

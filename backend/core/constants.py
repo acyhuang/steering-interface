@@ -15,3 +15,4 @@ DEMO_VARIANT_LABEL = "demo"
 
 # Default model configuration
 DEFAULT_BASE_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+# DEFAULT_BASE_MODEL = "meta-llama/Llama-3.3-70B-Instruct"

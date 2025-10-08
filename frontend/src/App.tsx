@@ -31,6 +31,9 @@ function App() {
   const [isDeveloperMode, setIsDeveloperMode] = useState(false)
   const [isAutoSteerEnabled, setIsAutoSteerEnabled] = useState(false)
   
+  // Parallel streaming state for auto-steer
+  const [isParallelStreaming, setIsParallelStreaming] = useState(false)
+  
   // Filter and sort state
   const [filterBy, setFilterBy] = useState<FilterOption>('activated')
   const [sortBy, setSortBy] = useState<SortOption>('activation')
@@ -120,8 +123,6 @@ function App() {
     }
 
     try {
-      setIsStreaming(true)
-      
       // Add user message to conversation immediately
       const userMessage = { role: 'user' as const, content }
       setConversation(prev => ({
@@ -132,15 +133,36 @@ function App() {
       // Prepare messages for API (include conversation history)
       const messages = [...conversation.messages, userMessage]
       
+      // Branch based on auto-steer enabled
+      if (isAutoSteerEnabled && conversation.currentVariant) {
+        await handleAutoSteerParallel(content, messages)
+      } else {
+        await handleSingleResponse(messages)
+      }
+      
+    } catch (error) {
+      console.error('Failed to send message:', error)
+      setIsStreaming(false)
+      throw error // Re-throw to let Chat component handle the error display
+    }
+  }
+
+  const handleSingleResponse = async (messages: any[]) => {
+    if (!conversation.id) {
+      throw new Error('No active conversation')
+    }
+
+    try {
+      setIsStreaming(true)
+      
       // Send message to backend and handle streaming response
       const stream = await conversationApi.sendMessage(conversation.id, messages)
       const reader = stream.getReader()
       
       // Add empty assistant message that we'll update as chunks arrive
-      let assistantMessage = { role: 'assistant' as const, content: '' }
       setConversation(prev => ({
         ...prev,
-        messages: [...prev.messages, assistantMessage]
+        messages: [...prev.messages, { role: 'assistant', content: '' }]
       }))
 
       // Read streaming response
@@ -169,75 +191,137 @@ function App() {
       // Load features after message completion (features activate after messages)
       await loadFeatures(conversation.id)
       
-      // Auto-steer logic: if enabled, trigger auto-steer and comparison
-      if (isAutoSteerEnabled && conversation.currentVariant) {
-        try {
-          console.log('Auto-steer enabled, triggering auto-steer...')
-          
-          // Extract the current user query (last user message)
-          const lastUserMessage = messages.filter(m => m.role === 'user').pop()
-          const query = lastUserMessage?.content || ''
-          
-          // Convert conversation history to simple strings (last 6 messages for context)
-          const conversationContext = messages
-            .slice(-6)
-            .map(msg => `${msg.role}: ${msg.content}`)
-          
-          // Call auto-steer API with correct format
-          const autoSteerResult = await variantApi.autoSteer(
+    } catch (error) {
+      console.error('Failed to send single response:', error)
+      setIsStreaming(false)
+      throw error
+    }
+  }
+
+  const handleAutoSteerParallel = async (userQuery: string, messages: any[]) => {
+    if (!conversation.id || !conversation.currentVariant) {
+      throw new Error('No active conversation or variant')
+    }
+
+    try {
+      // Enter comparison mode with skeleton immediately for instant feedback
+      console.log('Auto-steer parallel: Showing loading state immediately...')
+      setIsInComparisonMode(true)
+      setIsParallelStreaming(true)
+      setOriginalResponseForComparison('')
+      setComparisonResponse('')
+      setIsComparisonStreaming(true)
+      
+      console.log('Auto-steer parallel: Starting auto-steer analysis...')
+      
+      // Convert conversation history to simple strings (last 6 messages for context)
+      const conversationContext = messages
+        .slice(-6)
+        .map(msg => `${msg.role}: ${msg.content}`)
+      
+      // Call auto-steer API (user sees skeleton during this)
+      const autoSteerResult = await variantApi.autoSteer(
+        conversation.currentVariant.uuid,
+        userQuery,
+        conversationContext
+      )
+      
+      // Check if auto-steer was successful and returned suggestions
+      if (!autoSteerResult.success || autoSteerResult.suggested_features.length === 0) {
+        console.log('Auto-steer found no modifications, falling back to single response')
+        // Exit comparison mode and fall back to single response
+        setIsInComparisonMode(false)
+        setIsParallelStreaming(false)
+        setIsComparisonStreaming(false)
+        setOriginalResponseForComparison('')
+        setComparisonResponse('')
+        toast.info('No steering adjustments needed for this query')
+        await handleSingleResponse(messages)
+        return
+      }
+      
+      // Apply suggested modifications as pending changes
+      for (const feature of autoSteerResult.suggested_features) {
+        if (feature.pending_modification !== null) {
+          await variantApi.steerFeature(
             conversation.currentVariant.uuid,
-            query,
-            conversationContext
+            feature.uuid,
+            feature.pending_modification
           )
-          
-          // Check if auto-steer was successful and returned suggestions
-          if (!autoSteerResult.success || autoSteerResult.suggested_features.length === 0) {
-            toast.warning('Auto-steer could not find suitable features to modify. Try rephrasing your request.')
-            return
-          }
-          
-          // Apply suggested modifications as pending changes
-          // The backend returns suggested_features (UnifiedFeature objects) with pending_modification values
-          for (const feature of autoSteerResult.suggested_features) {
-            if (feature.pending_modification !== null) {
-              await variantApi.steerFeature(
-                conversation.currentVariant.uuid,
-                feature.uuid,
-                feature.pending_modification
-              )
-            }
-          }
-          
-          // Reload features to get updated pending modifications
-          const updatedFeatures = await loadFeatures(conversation.id)
-          
-          // Debug: Check what features we got back
-          console.log('Auto-steer: Updated features count:', updatedFeatures.length)
-          const featuresWithPending = updatedFeatures.filter(f => f.pending_modification !== null)
-          console.log('Auto-steer: Features with pending modifications:', featuresWithPending.length)
-          console.log('Auto-steer: Pending features:', featuresWithPending.map(f => ({ label: f.label, pending: f.pending_modification })))
-          
-          // Build current conversation state locally (React state updates are async, so we need to construct this manually)
-          const currentConversation: ConversationState = {
-            id: conversation.id,
-            messages: [...conversation.messages, userMessage, { role: 'assistant', content: fullResponse }],
-            currentVariant: conversation.currentVariant,
-            isLoading: false
-          }
-          
-          // Generate comparison response if we have pending modifications
-          await generateComparisonResponse(updatedFeatures, currentConversation)
-                    
-        } catch (error) {
-          console.error('Auto-steer failed:', error)
-          toast.error('Auto-steer failed. Continuing with normal response.')
-          // Don't throw - let the user continue with normal flow
         }
       }
+      
+      // Reload features to get updated pending modifications
+      await loadFeatures(conversation.id)
+      
+      console.log('Auto-steer: Applied pending modifications, starting parallel streaming...')
+      // (Comparison mode already active with skeleton from the start of this function)
+      
+      // Start both API calls in parallel
+      const [defaultStream, steeredStream] = await Promise.all([
+        conversationApi.sendMessage(conversation.id, messages, { applyPendingModifications: false }),
+        conversationApi.sendMessage(conversation.id, messages, { applyPendingModifications: true })
+      ])
+      
+      // Create readers for both streams
+      const defaultReader = defaultStream.getReader()
+      const steeredReader = steeredStream.getReader()
+      
+      // Stream both responses simultaneously
+      let defaultResponse = ''
+      let steeredResponse = ''
+      let defaultDone = false
+      let steeredDone = false
+      
+      // Read both streams in parallel
+      while (!defaultDone || !steeredDone) {
+        const results = await Promise.all([
+          defaultDone ? Promise.resolve({ done: true, value: undefined }) : defaultReader.read(),
+          steeredDone ? Promise.resolve({ done: true, value: undefined }) : steeredReader.read()
+        ])
+        
+        const [defaultResult, steeredResult] = results
+        
+        // Process default stream
+        if (!defaultResult.done && defaultResult.value) {
+          const chunk = new TextDecoder().decode(defaultResult.value)
+          defaultResponse += chunk
+          setOriginalResponseForComparison(defaultResponse)
+        } else {
+          defaultDone = true
+        }
+        
+        // Process steered stream
+        if (!steeredResult.done && steeredResult.value) {
+          const chunk = new TextDecoder().decode(steeredResult.value)
+          steeredResponse += chunk
+          setComparisonResponse(steeredResponse)
+        } else {
+          steeredDone = true
+        }
+      }
+      
+      // Streaming complete
+      setIsParallelStreaming(false)
+      setIsComparisonStreaming(false)
+      
+      // Add the DEFAULT response to conversation history (user can choose to accept steered version later)
+      setConversation(prev => ({
+        ...prev,
+        messages: [...prev.messages, { role: 'assistant', content: defaultResponse }]
+      }))
+      
+      console.log('Auto-steer parallel: Streaming completed successfully')
+      
     } catch (error) {
-      console.error('Failed to send message:', error)
-      setIsStreaming(false)
-      throw error // Re-throw to let Chat component handle the error display
+      console.error('Auto-steer parallel failed:', error)
+      setIsParallelStreaming(false)
+      setIsComparisonStreaming(false)
+      setIsInComparisonMode(false)
+      toast.error('Auto-steer failed. Falling back to normal response.')
+      
+      // Fall back to single response
+      await handleSingleResponse(messages)
     }
   }
 
@@ -380,6 +464,7 @@ function App() {
       setIsInComparisonMode(false)
       setComparisonResponse('')
       setIsComparisonStreaming(false)
+      setIsParallelStreaming(false)
       setOriginalResponseForComparison('')
       
       // Reload features to get updated state
@@ -410,6 +495,7 @@ function App() {
       setIsInComparisonMode(false)
       setComparisonResponse('')
       setIsComparisonStreaming(false)
+      setIsParallelStreaming(false)
       setOriginalResponseForComparison('')
       
       // Reload features to get updated state
@@ -545,6 +631,7 @@ function App() {
             comparisonResponse={comparisonResponse}
             originalResponseForComparison={originalResponseForComparison}
             isComparisonStreaming={isComparisonStreaming}
+            isParallelStreaming={isParallelStreaming}
             onSendMessage={handleSendMessage}
             onConfirmChanges={handleConfirmChanges}
             onRejectChanges={handleRejectChanges}

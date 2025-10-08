@@ -6,6 +6,7 @@ import FeatureTableHeader from './FeatureTableHeader'
 import SearchInput from './SearchInput'
 import SearchResults from './SearchResults'
 import { variantApi } from '@/services/api'
+import { Switch } from './ui/switch'
 
 interface ControlsProps {
   features: UnifiedFeature[]
@@ -106,17 +107,21 @@ export default function Controls({
       )}
       
       <div className="p-3 border-b border-border">
-        <div className="flex items-center justify-between">
+        <div className="items-center space-y-2">
           <div className="text-base font-mono uppercase font-medium">Controls</div>
-          <div className="flex items-center gap-2">
+
+          <div className={`flex items-center gap-2 border rounded-md p-2 transition-colors ${
+            isAutoSteerEnabled 
+              ? 'border-blue-200 bg-blue-50' 
+              : 'border-border bg-muted/30'
+          }`}>
             <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
+              <Switch
                 checked={isAutoSteerEnabled}
-                onChange={(e) => onAutoSteerToggle(e.target.checked)}
-                className="rounded border-border"
+                onCheckedChange={onAutoSteerToggle}
               />
-              <span className="text-xs text-muted-foreground">Auto-steer</span>
+              <span className={`text-sm font-medium ${isAutoSteerEnabled ? 'text-blue-900' : 'text-muted-foreground'}`}>Auto-steer</span>
+              <span className={`text-sm ${isAutoSteerEnabled ? 'text-blue-900' : 'text-muted-foreground'}`}>Automatically suggest features to steer based on user query</span>
             </label>
           </div>
         </div>

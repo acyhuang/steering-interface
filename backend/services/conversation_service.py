@@ -83,7 +83,8 @@ class ConversationService:
         messages: List[ChatMessage],
         ember_client: AsyncClient,
         variant_service: VariantService,
-        stream: bool = True
+        stream: bool = True,
+        apply_pending_modifications: bool = True
     ) -> AsyncGenerator[str, None]:
         """
         Send a message in a conversation and stream the response.
@@ -94,6 +95,7 @@ class ConversationService:
             ember_client: Ember SDK client for API interactions
             variant_service: Variant service for accessing feature modifications
             stream: Whether to stream the response (currently always True for MVP)
+            apply_pending_modifications: Whether to apply pending feature modifications (default: True)
             
         Yields:
             str: Streaming response content chunks
@@ -125,11 +127,17 @@ class ConversationService:
         # Apply confirmed modifications
         confirmed_modifications = variant_service._variant_modified_features.get(variant_id, {})
         
-        # Apply pending modifications (these take precedence over confirmed ones)
-        pending_modifications = variant_service._variant_pending_features.get(variant_id, {})
-        
-        # Combine modifications (pending overrides confirmed for same feature)
-        all_modifications = {**confirmed_modifications, **pending_modifications}
+        # Conditionally apply pending modifications based on the flag
+        if apply_pending_modifications:
+            # Apply pending modifications (these take precedence over confirmed ones)
+            pending_modifications = variant_service._variant_pending_features.get(variant_id, {})
+            # Combine modifications (pending overrides confirmed for same feature)
+            all_modifications = {**confirmed_modifications, **pending_modifications}
+            logger.debug(f"Applying pending modifications: apply_pending_modifications={apply_pending_modifications}")
+        else:
+            # Only apply confirmed modifications, skip pending ones
+            all_modifications = confirmed_modifications
+            logger.debug(f"Skipping pending modifications: apply_pending_modifications={apply_pending_modifications}")
         
         if all_modifications:
             logger.debug(f"Applying {len(all_modifications)} feature modifications to variant")

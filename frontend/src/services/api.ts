@@ -26,9 +26,16 @@ export const conversationApi = {
 
   sendMessage: async (
     conversationId: string, 
-    messages: ChatMessage[]
+    messages: ChatMessage[],
+    options?: { applyPendingModifications?: boolean }
   ): Promise<ReadableStream> => {
-    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
+    // Build URL with query params
+    const url = new URL(`${API_BASE_URL}/conversations/${conversationId}/messages`);
+    if (options?.applyPendingModifications !== undefined) {
+      url.searchParams.append('apply_pending_modifications', String(options.applyPendingModifications));
+    }
+
+    const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

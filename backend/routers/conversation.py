@@ -87,6 +87,7 @@ async def create_conversation(
 async def send_message(
     conversation_id: str,
     request: ConversationMessageRequest,
+    apply_pending_modifications: bool = True,
     ember_client: AsyncClient = Depends(get_ember_client),
     variant_service: VariantService = Depends(get_variant_service)
 ):
@@ -96,7 +97,9 @@ async def send_message(
     Args:
         conversation_id: UUID of the conversation
         request: ConversationMessageRequest containing messages and stream flag
+        apply_pending_modifications: Whether to apply pending feature modifications (default: True)
         ember_client: Ember SDK client injected via dependency
+        variant_service: Variant service for accessing feature modifications
         
     Returns:
         StreamingResponse: Real-time streaming response from the AI model
@@ -132,7 +135,8 @@ async def send_message(
                     messages=request.messages,
                     ember_client=ember_client,
                     variant_service=variant_service,
-                    stream=request.stream
+                    stream=request.stream,
+                    apply_pending_modifications=apply_pending_modifications
                 ):
                     yield content_chunk
             except Exception as e:

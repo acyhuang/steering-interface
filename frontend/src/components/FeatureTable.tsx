@@ -62,7 +62,7 @@ export default function FeatureTable({
               <TableCell className="font-mono text-right w-20">
                 {feature.activation !== null ? feature.activation.toFixed(1) : '-'}
               </TableCell>
-              <TableCell className={`font-mono text-right w-20${feature.modification !== 0 ? " font-medium text-foreground" : ""}`}>
+              <TableCell className={`font-mono text-right w-20${feature.modification !== 0 ? " font-bold text-foreground" : ""}`}>
                 {feature.modification.toFixed(1)}
               </TableCell>
             </TableRow>
