@@ -2,7 +2,6 @@
 - variant and conversation storage / management
 
 # medium
-- auto-steer endpoint
 
 # small
 - custom slider that shows increase vs decrease

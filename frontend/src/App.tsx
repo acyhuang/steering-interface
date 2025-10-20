@@ -618,7 +618,7 @@ function App() {
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Chat Area */}
-        <div className={`flex-1 ${isControlsVisible ? 'w-3/5' : 'w-full'} transition-all duration-300`}>
+        <div className={`flex-1 ${isControlsVisible ? 'w-6/10' : 'w-full'} transition-all duration-300`}>
           <Chat
             conversation={conversation}
             comparisonState={comparisonState}
@@ -637,7 +637,7 @@ function App() {
 
         {/* Controls Sidebar */}
         {isControlsVisible && (
-          <div className="w-2/5 border-l border-border">
+          <div className="w-4/10 border-l border-border">
             <Controls
               features={processedFeatures}
               selectedFeature={selectedFeature}

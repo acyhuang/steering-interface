@@ -120,8 +120,10 @@ export default function Controls({
                 checked={isAutoSteerEnabled}
                 onCheckedChange={onAutoSteerToggle}
               />
-              <span className={`text-sm font-medium ${isAutoSteerEnabled ? 'text-blue-900' : 'text-muted-foreground'}`}>Auto-steer</span>
-              <span className={`text-sm ${isAutoSteerEnabled ? 'text-blue-900' : 'text-muted-foreground'}`}>Automatically suggest features to steer based on user query</span>
+              <div className="">
+                <span className={`text-sm font-medium pr-2 ${isAutoSteerEnabled ? 'text-blue-900' : 'text-muted-foreground'}`}>Auto-steer</span>
+                <span className={`text-sm ${isAutoSteerEnabled ? 'text-blue-900' : 'text-muted-foreground'}`}> Automatically suggest features to steer based on query</span>
+              </div>
             </label>
           </div>
         </div>

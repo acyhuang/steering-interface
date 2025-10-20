@@ -126,7 +126,8 @@ export default function Chat({
                 {conversation.messages.map((message, index) => {
                   // Hide the last assistant message when in comparison mode and we have comparison content
                   // Don't hide it during initial loading (when both responses are empty)
-                  if (comparisonState !== 'idle' && (originalResponseForComparison || comparisonResponse)) {
+                  // if (comparisonState !== 'idle' && (originalResponseForComparison || comparisonResponse)) {
+                  if (comparisonState !== 'idle' && comparisonMode == 'manual') {
                     const lastAssistantIndex = [...conversation.messages].map((m, i) => m.role === 'assistant' ? i : -1)
                       .filter(i => i !== -1)
                       .pop() ?? -1
